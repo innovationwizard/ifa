@@ -1,0 +1,46 @@
+* text=auto eol=lf
+
+# Source code
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.mjs       text eol=lf
+*.cjs       text eol=lf
+*.json      text eol=lf
+*.jsonc     text eol=lf
+*.md        text eol=lf
+*.mdx       text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.toml      text eol=lf
+*.sql       text eol=lf
+*.prisma    text eol=lf
+
+# Shell scripts must keep LF even on Windows checkouts
+*.sh        text eol=lf
+
+# Binary — never diff or merge
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.avif      binary
+*.ico       binary
+*.pdf       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.otf       binary
+*.eot       binary
+
+# Lockfiles — collapse in diffs
+pnpm-lock.yaml    -diff
+package-lock.json -diff
+yarn.lock         -diff
+
+# Generated / vendored — mark for GitHub linguist
+prisma/generated/**  linguist-generated=true

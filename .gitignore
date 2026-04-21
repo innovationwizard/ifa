@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+next-env.d.ts
+
+# Environment files (never commit secrets — keep only the template)
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# Vercel
+.vercel/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Generated / build artifacts
+dist/
+build/
+tsconfig.tsbuildinfo
+
+# Prisma (generated client kept in node_modules)
+/prisma/migrations/dev/
+
+# Supabase CLI (local state)
+supabase/.branches/
+supabase/.temp/
+
+# Sentry / source maps (will be gitignored if/when Sentry is added)
+.sentryclirc
