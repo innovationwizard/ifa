@@ -5,7 +5,6 @@ node_modules/
 # Next.js build output
 .next/
 out/
-next-env.d.ts
 
 # Environment files (never commit secrets — keep only the template)
 .env
