@@ -1,0 +1,106 @@
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import nextPlugin from '@next/eslint-plugin-next';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import jsxA11yPlugin from 'eslint-plugin-jsx-a11y';
+import eslintCommentsPlugin from '@eslint-community/eslint-plugin-eslint-comments/configs';
+import prettierConfig from 'eslint-config-prettier';
+import prettierPlugin from 'eslint-plugin-prettier';
+import globals from 'globals';
+
+export default tseslint.config(
+  {
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      'coverage/**',
+      'playwright-report/**',
+      'test-results/**',
+      'next-env.d.ts',
+      'out/**',
+      '.vercel/**',
+      'pnpm-lock.yaml',
+    ],
+  },
+
+  js.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
+
+  {
+    ...reactPlugin.configs.flat.recommended,
+    settings: { react: { version: 'detect' } },
+  },
+  reactPlugin.configs.flat['jsx-runtime'],
+
+  {
+    plugins: { 'react-hooks': reactHooksPlugin },
+    rules: reactHooksPlugin.configs.recommended.rules,
+  },
+
+  jsxA11yPlugin.flatConfigs.recommended,
+
+  {
+    plugins: { '@next/next': nextPlugin },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
+    },
+  },
+
+  eslintCommentsPlugin.recommended,
+
+  {
+    plugins: { prettier: prettierPlugin },
+    rules: {
+      'prettier/prettier': 'error',
+    },
+  },
+  prettierConfig,
+
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        {
+          'ts-expect-error': 'allow-with-description',
+          'ts-ignore': 'allow-with-description',
+          'ts-nocheck': 'allow-with-description',
+          'ts-check': false,
+          minimumDescriptionLength: 10,
+        },
+      ],
+      '@eslint-community/eslint-comments/require-description': [
+        'error',
+        { ignore: ['eslint-enable'] },
+      ],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-debugger': 'error',
+    },
+  },
+
+  {
+    files: ['**/*.{js,mjs,cjs}', 'eslint.config.mjs', 'next.config.ts', 'postcss.config.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+  },
+);

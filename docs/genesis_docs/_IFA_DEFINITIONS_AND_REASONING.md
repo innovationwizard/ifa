@@ -34,39 +34,39 @@
 
 ### 1.1 Guatemalan Financial System Terms
 
-| Term | Definition | Relevance to IFA |
-|---|---|---|
-| **FEL** (Facturación Electrónica en Línea) | Guatemala's mandatory electronic invoicing system administered by SAT. All IVA-registered businesses must issue electronic documents (DTEs) through certified providers. | Primary data source. Every sale generates a DTE that IFA ingests and processes automatically. |
-| **DTE** (Documento Tributario Electrónico) | An individual electronic tax document issued through FEL. Types include FACTURA (invoice), NOTA DE CRÉDITO (credit note), NOTA DE DÉBITO (debit note), RECIBO (receipt), and others. | The atomic unit of fiscal data in IFA. Each DTE contains: UUID, series, number, NIT emisor, NIT receptor, line items, IVA, total. |
-| **SAT** (Superintendencia de Administración Tributaria) | Guatemala's tax authority. Administers FEL, collects IVA, and audits businesses. | IFA generates SAT-compatible reports and maintains audit trails for SAT compliance verification. |
-| **NIT** (Número de Identificación Tributaria) | Guatemala's tax identification number assigned to every business and individual taxpayer. Format: digits with a check digit (e.g., 12345678-9). | Unique identifier for each organization (tenant) in IFA. Used for FEL matching and reconciliation. |
-| **IVA** (Impuesto al Valor Agregado) | Guatemala's value-added tax, currently 12%. Applied to most goods and services. Businesses must track IVA crédito (paid on purchases) vs. IVA débito (collected on sales). | IFA automatically calculates IVA liability from FEL data, tracking crédito/débito balance in real time. |
-| **TPV** (Terminal Punto de Venta) | Point-of-sale terminal for card payments. In Guatemala, major networks are BAC Credomatic and Banco Industrial. | Second primary data source. Card transactions from TPV are matched against FEL DTEs for reconciliation. |
-| **Certificador FEL** | A SAT-authorized company that certifies electronic documents. Examples: GUATEFACTURAS, DIGIFACT, INFILE, G4S. Each has its own API. | IFA connects to certifier APIs to pull DTEs. Each certifier requires a separate adapter due to differing API designs. |
-| **MIPYME** (Micro, Pequeña y Mediana Empresa) | Micro, small, and medium enterprises. 98-99% of Guatemala's formal businesses. | IFA's entire target market. Product and pricing designed for this segment's budget, technical capacity, and operational needs. |
-| **NIIF-PYME** | International Financial Reporting Standards for SMEs, adopted in Guatemala. Defines the chart of accounts structure and reporting requirements. | IFA's default chart of accounts template follows NIIF-PYME structure. |
-| **Conciliación** | Reconciliation — the process of matching transactions from different sources (bank, FEL, TPV) to verify they represent the same economic event. | IFA's core "magic" feature. Automated conciliación eliminates the manual, error-prone process that costs SME owners hours weekly. |
+| Term                                                    | Definition                                                                                                                                                                           | Relevance to IFA                                                                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| **FEL** (Facturación Electrónica en Línea)              | Guatemala's mandatory electronic invoicing system administered by SAT. All IVA-registered businesses must issue electronic documents (DTEs) through certified providers.             | Primary data source. Every sale generates a DTE that IFA ingests and processes automatically.                                     |
+| **DTE** (Documento Tributario Electrónico)              | An individual electronic tax document issued through FEL. Types include FACTURA (invoice), NOTA DE CRÉDITO (credit note), NOTA DE DÉBITO (debit note), RECIBO (receipt), and others. | The atomic unit of fiscal data in IFA. Each DTE contains: UUID, series, number, NIT emisor, NIT receptor, line items, IVA, total. |
+| **SAT** (Superintendencia de Administración Tributaria) | Guatemala's tax authority. Administers FEL, collects IVA, and audits businesses.                                                                                                     | IFA generates SAT-compatible reports and maintains audit trails for SAT compliance verification.                                  |
+| **NIT** (Número de Identificación Tributaria)           | Guatemala's tax identification number assigned to every business and individual taxpayer. Format: digits with a check digit (e.g., 12345678-9).                                      | Unique identifier for each organization (tenant) in IFA. Used for FEL matching and reconciliation.                                |
+| **IVA** (Impuesto al Valor Agregado)                    | Guatemala's value-added tax, currently 12%. Applied to most goods and services. Businesses must track IVA crédito (paid on purchases) vs. IVA débito (collected on sales).           | IFA automatically calculates IVA liability from FEL data, tracking crédito/débito balance in real time.                           |
+| **TPV** (Terminal Punto de Venta)                       | Point-of-sale terminal for card payments. In Guatemala, major networks are BAC Credomatic and Banco Industrial.                                                                      | Second primary data source. Card transactions from TPV are matched against FEL DTEs for reconciliation.                           |
+| **Certificador FEL**                                    | A SAT-authorized company that certifies electronic documents. Examples: GUATEFACTURAS, DIGIFACT, INFILE, G4S. Each has its own API.                                                  | IFA connects to certifier APIs to pull DTEs. Each certifier requires a separate adapter due to differing API designs.             |
+| **MIPYME** (Micro, Pequeña y Mediana Empresa)           | Micro, small, and medium enterprises. 98-99% of Guatemala's formal businesses.                                                                                                       | IFA's entire target market. Product and pricing designed for this segment's budget, technical capacity, and operational needs.    |
+| **NIIF-PYME**                                           | International Financial Reporting Standards for SMEs, adopted in Guatemala. Defines the chart of accounts structure and reporting requirements.                                      | IFA's default chart of accounts template follows NIIF-PYME structure.                                                             |
+| **Conciliación**                                        | Reconciliation — the process of matching transactions from different sources (bank, FEL, TPV) to verify they represent the same economic event.                                      | IFA's core "magic" feature. Automated conciliación eliminates the manual, error-prone process that costs SME owners hours weekly. |
 
 ### 1.2 IFA Product Terms
 
-| Term | Definition | Notes |
-|---|---|---|
-| **Financial Health Score** | IFA's proprietary 0–1000 composite metric that quantifies the overall financial health of a business based on 7 weighted factors derived from the business's own transaction and accounting data. | NOT a credit score. Does not use external bureau data. Built entirely from data the business generates through IFA. |
-| **Reconciliation Confidence Score** | A 0.0–1.0 float indicating how certain the system is that two transactions (e.g., a FEL DTE and a TPV card transaction) represent the same economic event. | Exact match (all fields match) = 1.0. Probable match (amount + date match, time close) = 0.7-0.9. Uncertain = below 0.7, routed to manual queue. |
-| **Accounting Rule** | A user-defined IF-THEN automation: IF a transaction matches certain conditions (merchant name, amount range, category), THEN post it to specific accounts with specific splits. | Enables zero-touch accounting for recurring transaction patterns. Rules are org-specific and prioritized. |
-| **Mission** | A time-bound gamification challenge that guides users toward healthy financial behaviors. Types: onboarding (one-time), weekly (rotate Mondays), monthly. | Adapted from Duolingo's quest system. Missions are behavioral nudges, not arbitrary point-farming. |
-| **Streak** | Consecutive calendar days where the user has logged in and performed at least one meaningful action (reconcile a transaction or review dashboard). | Mechanic borrowed directly from Duolingo. Designed to build the daily habit of financial oversight. |
-| **XP (Puntos de Experiencia)** | Points earned for completing financial actions within IFA. Accumulate toward levels. Cannot be purchased. | XP is earned only through real financial management actions, never through payment, to maintain credibility. |
-| **Canonical Transaction** | IFA's internal, normalized representation of a transaction regardless of its source (FEL, TPV, bank CSV, manual). All adapters convert source-specific formats into this schema. | Critical for reconciliation. The adapter pattern ensures the reconciliation engine operates on uniform data. |
+| Term                                | Definition                                                                                                                                                                                        | Notes                                                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Financial Health Score**          | IFA's proprietary 0–1000 composite metric that quantifies the overall financial health of a business based on 7 weighted factors derived from the business's own transaction and accounting data. | NOT a credit score. Does not use external bureau data. Built entirely from data the business generates through IFA.                              |
+| **Reconciliation Confidence Score** | A 0.0–1.0 float indicating how certain the system is that two transactions (e.g., a FEL DTE and a TPV card transaction) represent the same economic event.                                        | Exact match (all fields match) = 1.0. Probable match (amount + date match, time close) = 0.7-0.9. Uncertain = below 0.7, routed to manual queue. |
+| **Accounting Rule**                 | A user-defined IF-THEN automation: IF a transaction matches certain conditions (merchant name, amount range, category), THEN post it to specific accounts with specific splits.                   | Enables zero-touch accounting for recurring transaction patterns. Rules are org-specific and prioritized.                                        |
+| **Mission**                         | A time-bound gamification challenge that guides users toward healthy financial behaviors. Types: onboarding (one-time), weekly (rotate Mondays), monthly.                                         | Adapted from Duolingo's quest system. Missions are behavioral nudges, not arbitrary point-farming.                                               |
+| **Streak**                          | Consecutive calendar days where the user has logged in and performed at least one meaningful action (reconcile a transaction or review dashboard).                                                | Mechanic borrowed directly from Duolingo. Designed to build the daily habit of financial oversight.                                              |
+| **XP (Puntos de Experiencia)**      | Points earned for completing financial actions within IFA. Accumulate toward levels. Cannot be purchased.                                                                                         | XP is earned only through real financial management actions, never through payment, to maintain credibility.                                     |
+| **Canonical Transaction**           | IFA's internal, normalized representation of a transaction regardless of its source (FEL, TPV, bank CSV, manual). All adapters convert source-specific formats into this schema.                  | Critical for reconciliation. The adapter pattern ensures the reconciliation engine operates on uniform data.                                     |
 
 ### 1.3 Technical Terms
 
-| Term | Definition | Context |
-|---|---|---|
-| **Adapter** | A software component that translates between an external system's API/format and IFA's internal canonical format. Each FEL certifier, bank, and acquirer gets its own adapter. | Implements the `DataSourceAdapter` interface. Isolates external API changes from core business logic. |
-| **Row-Level Security** | Database access control where every query is automatically filtered by `organizationId`, ensuring one tenant can never access another tenant's data. | Implemented via Prisma middleware, not database-level RLS, for portability and testability. |
-| **Cursor-Based Pagination** | A pagination strategy using an opaque cursor (typically the last item's ID or timestamp) instead of page numbers. More efficient for large datasets and immune to insertion/deletion issues. | Used across all list endpoints. Superior to offset pagination for financial transaction feeds that grow continuously. |
-| **Idempotent** | An operation that produces the same result regardless of how many times it's executed. Critical for retried API calls and queue processing. | All ingestion workers and reconciliation operations are idempotent. A DTE processed twice produces only one transaction. |
+| Term                        | Definition                                                                                                                                                                                   | Context                                                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Adapter**                 | A software component that translates between an external system's API/format and IFA's internal canonical format. Each FEL certifier, bank, and acquirer gets its own adapter.               | Implements the `DataSourceAdapter` interface. Isolates external API changes from core business logic.                    |
+| **Row-Level Security**      | Database access control where every query is automatically filtered by `organizationId`, ensuring one tenant can never access another tenant's data.                                         | Implemented via Prisma middleware, not database-level RLS, for portability and testability.                              |
+| **Cursor-Based Pagination** | A pagination strategy using an opaque cursor (typically the last item's ID or timestamp) instead of page numbers. More efficient for large datasets and immune to insertion/deletion issues. | Used across all list endpoints. Superior to offset pagination for financial transaction feeds that grow continuously.    |
+| **Idempotent**              | An operation that produces the same result regardless of how many times it's executed. Critical for retried API calls and queue processing.                                                  | All ingestion workers and reconciliation operations are idempotent. A DTE processed twice produces only one transaction. |
 
 ---
 
@@ -85,6 +85,7 @@ Credit Karma solved a parallel problem in the US: credit data was opaque, scatte
 IFA does the same for Guatemalan SME financial data: makes it unified, continuous, and actionable. The adaptation required is replacing credit bureau data (unavailable in Guatemala) with a proprietary Financial Health Score derived from the business's own data.
 
 **What IFA adopts from Credit Karma:**
+
 - Free monitoring tier with premium upsell (adapted to SaaS model)
 - Personalized dashboard with single headline metric (Financial Health Score instead of credit score)
 - Factor-based score explanation ("this is helping, this is hurting")
@@ -93,6 +94,7 @@ IFA does the same for Guatemalan SME financial data: makes it unified, continuou
 - Connected accounts for unified financial view
 
 **What IFA does NOT adopt from Credit Karma:**
+
 - Marketplace model (IFA is SaaS, not ad/affiliate-driven)
 - Credit card/loan offers (irrelevant for B2B SME tool)
 - Consumer credit bureau integration (unavailable in Guatemala)
@@ -104,6 +106,7 @@ SME owners in Guatemala are not finance professionals. They need to build financ
 The insight: reconciling transactions, reviewing reports, and maintaining books are inherently boring but critical. Gamification transforms these from chores into achievements.
 
 **What IFA adopts from Duolingo:**
+
 - Streaks (daily engagement habit)
 - XP + Levels (progressive mastery)
 - Bite-sized missions (guided behavior)
@@ -112,6 +115,7 @@ The insight: reconciling transactions, reviewing reports, and maintaining books 
 - Adaptive difficulty (onboarding progressively reveals features)
 
 **What IFA does NOT adopt from Duolingo:**
+
 - Hearts/lives (punitive mechanics inappropriate for financial tools)
 - Social/friends features (privacy-sensitive in finance)
 - Freemium with ads (undermines trust in financial software)
@@ -121,25 +125,25 @@ The insight: reconciling transactions, reviewing reports, and maintaining books 
 
 ## 3. Benchmark Mapping — What Came From Where
 
-| IFA Feature | Primary Benchmark | Adaptation |
-|---|---|---|
-| Financial Health Score gauge | Credit Karma credit score | Replaced bureau data with proprietary 7-factor composite from transaction/accounting data |
-| Score factor breakdown | Credit Karma score factors | Adapted factors from credit (utilization, payment history) to business finance (reconciliation, cash flow, IVA) |
-| Alert system | Credit Karma credit monitoring | Changed from credit changes to financial anomalies, reconciliation failures, IVA deadlines |
-| AI recommendations | Credit Karma AI-driven insights | Changed from product offers to operational improvements ("reduce fuel spending", "reconcile faster") |
-| Connected accounts view | Credit Karma connected accounts | Adapted from consumer bank accounts to business FEL + TPV + bank integrations |
-| Transaction feed | Credit Karma transaction monitoring | Added reconciliation status, multi-source view (FEL + TPV + bank), and auto-categorization |
-| Report generation | QuickBooks (beyond benchmarks) | Guatemala-specific: IVA report, SAT-compatible exports, NIIF-PYME aligned statements |
-| Streaks | Duolingo streaks | Same mechanic, financial context: consecutive days of reconciliation/review |
-| XP + Levels | Duolingo XP system | Earned through financial actions, titles reflect financial expertise progression |
-| Missions | Duolingo quests/challenges | Changed from language exercises to financial management challenges |
-| Badges | Duolingo achievements | Changed from learning milestones to financial health milestones |
-| Leaderboard | Duolingo leagues | Privacy-adapted: anonymous industry percentile instead of named rankings |
-| Onboarding flow | Duolingo onboarding | Adapted: quick setup, immediate value, progressive feature reveal |
-| Auto-categorization | IFA original (AI-powered) | Claude API for merchant categorization — no direct benchmark equivalent |
-| Reconciliation engine | IFA original (core product) | Multi-field matching algorithm — this IS the product's moat |
-| Accounting rules engine | QuickBooks bank rules | Enhanced with AI-suggested rules based on categorization patterns |
-| QuickBooks export | IFA original (interoperability) | Bridge to existing accounting workflows, reduces switching cost |
+| IFA Feature                  | Primary Benchmark                   | Adaptation                                                                                                      |
+| ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Financial Health Score gauge | Credit Karma credit score           | Replaced bureau data with proprietary 7-factor composite from transaction/accounting data                       |
+| Score factor breakdown       | Credit Karma score factors          | Adapted factors from credit (utilization, payment history) to business finance (reconciliation, cash flow, IVA) |
+| Alert system                 | Credit Karma credit monitoring      | Changed from credit changes to financial anomalies, reconciliation failures, IVA deadlines                      |
+| AI recommendations           | Credit Karma AI-driven insights     | Changed from product offers to operational improvements ("reduce fuel spending", "reconcile faster")            |
+| Connected accounts view      | Credit Karma connected accounts     | Adapted from consumer bank accounts to business FEL + TPV + bank integrations                                   |
+| Transaction feed             | Credit Karma transaction monitoring | Added reconciliation status, multi-source view (FEL + TPV + bank), and auto-categorization                      |
+| Report generation            | QuickBooks (beyond benchmarks)      | Guatemala-specific: IVA report, SAT-compatible exports, NIIF-PYME aligned statements                            |
+| Streaks                      | Duolingo streaks                    | Same mechanic, financial context: consecutive days of reconciliation/review                                     |
+| XP + Levels                  | Duolingo XP system                  | Earned through financial actions, titles reflect financial expertise progression                                |
+| Missions                     | Duolingo quests/challenges          | Changed from language exercises to financial management challenges                                              |
+| Badges                       | Duolingo achievements               | Changed from learning milestones to financial health milestones                                                 |
+| Leaderboard                  | Duolingo leagues                    | Privacy-adapted: anonymous industry percentile instead of named rankings                                        |
+| Onboarding flow              | Duolingo onboarding                 | Adapted: quick setup, immediate value, progressive feature reveal                                               |
+| Auto-categorization          | IFA original (AI-powered)           | Claude API for merchant categorization — no direct benchmark equivalent                                         |
+| Reconciliation engine        | IFA original (core product)         | Multi-field matching algorithm — this IS the product's moat                                                     |
+| Accounting rules engine      | QuickBooks bank rules               | Enhanced with AI-suggested rules based on categorization patterns                                               |
+| QuickBooks export            | IFA original (interoperability)     | Bridge to existing accounting workflows, reduces switching cost                                                 |
 
 ---
 
@@ -269,26 +273,26 @@ The color palette was designed to pass the "bank test": if a user showed the app
 
 ### 6.5 What Was Deliberately Avoided
 
-| Avoided Color | Reason |
-|---|---|
-| Pure white backgrounds | Too clinical, creates visual fatigue. Used `--ifa-navy-50` (#F4F7FB) instead — warm, easy on eyes. |
-| Bright green as primary | Too informal, reads as "startup" not "financial institution." Green is reserved for semantic success states. |
-| Red as accent | Anxiety-inducing in financial context. Red is only used for errors and negative changes. |
-| Purple | Not commonly associated with financial trust in Latin American markets. |
-| Black as primary text | Too harsh. Using `--ifa-gray-900` (#111827) is softer while remaining high-contrast. |
-| Gradients (primary UI) | Can look cheap or dated. Flat colors with subtle shadows project professionalism. Gradients may be used sparingly in marketing/landing page only. |
+| Avoided Color           | Reason                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pure white backgrounds  | Too clinical, creates visual fatigue. Used `--ifa-navy-50` (#F4F7FB) instead — warm, easy on eyes.                                                |
+| Bright green as primary | Too informal, reads as "startup" not "financial institution." Green is reserved for semantic success states.                                      |
+| Red as accent           | Anxiety-inducing in financial context. Red is only used for errors and negative changes.                                                          |
+| Purple                  | Not commonly associated with financial trust in Latin American markets.                                                                           |
+| Black as primary text   | Too harsh. Using `--ifa-gray-900` (#111827) is softer while remaining high-contrast.                                                              |
+| Gradients (primary UI)  | Can look cheap or dated. Flat colors with subtle shadows project professionalism. Gradients may be used sparingly in marketing/landing page only. |
 
 ### 6.6 Accessibility
 
 All color combinations in the palette meet WCAG 2.1 AA contrast requirements:
 
-| Combination | Contrast Ratio | Requirement |
-|---|---|---|
-| `--ifa-gray-900` on `--ifa-white` | 15.4:1 | Exceeds AAA (7:1) |
-| `--ifa-navy-700` on `--ifa-white` | 8.9:1 | Exceeds AAA |
-| `--ifa-white` on `--ifa-navy-800` | 12.1:1 | Exceeds AAA |
-| `--ifa-teal-600` on `--ifa-white` | 5.2:1 | Meets AA (4.5:1) |
-| `--ifa-error` on `--ifa-white` | 4.6:1 | Meets AA |
+| Combination                       | Contrast Ratio | Requirement       |
+| --------------------------------- | -------------- | ----------------- |
+| `--ifa-gray-900` on `--ifa-white` | 15.4:1         | Exceeds AAA (7:1) |
+| `--ifa-navy-700` on `--ifa-white` | 8.9:1          | Exceeds AAA       |
+| `--ifa-white` on `--ifa-navy-800` | 12.1:1         | Exceeds AAA       |
+| `--ifa-teal-600` on `--ifa-white` | 5.2:1          | Meets AA (4.5:1)  |
+| `--ifa-error` on `--ifa-white`    | 4.6:1          | Meets AA          |
 
 ---
 
@@ -332,6 +336,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 **Decision:** Use Next.js 15 with App Router as the full-stack framework.
 
 **Rationale:**
+
 - Server Components reduce client-side JavaScript, improving load times for users on slower Guatemalan internet connections
 - API Routes eliminate the need for a separate backend service for CRUD operations
 - Vercel deployment provides edge caching and automatic scaling
@@ -339,6 +344,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 - The developer ecosystem and hiring pool for Next.js is significantly larger than alternatives
 
 **Alternatives considered:**
+
 - Remix: Strong data loading model, but smaller ecosystem and less mature deployment story
 - SvelteKit: Performance advantage, but much smaller hiring pool for scaling the team
 - Separate frontend + backend (React + NestJS): More infrastructure to manage, slower iteration
@@ -348,6 +354,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 **Decision:** Separate Python service for AI/ML workloads, deployed on AWS App Runner.
 
 **Rationale:**
+
 - Python is the de facto language for AI/ML. Claude API SDK, pandas, scikit-learn, and all ML tooling is Python-first
 - Separating AI from the main Node.js app prevents CPU-intensive score computations from blocking API responses
 - App Runner provides auto-scaling for variable AI workload without managing containers
@@ -360,6 +367,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 **Decision:** Prisma as the ORM with PostgreSQL.
 
 **Rationale:**
+
 - Type-safe queries with auto-generated TypeScript types from the schema
 - Declarative migration management with `prisma migrate`
 - Middleware layer for multi-tenancy (`organizationId` injection) and audit logging
@@ -373,6 +381,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 **Decision:** Auth0 as the identity provider.
 
 **Rationale:**
+
 - Enterprise-grade security without building auth from scratch
 - SAML federation for bank partner portals (BAC, Banco Industrial SSO)
 - Built-in MFA (TOTP, SMS) — critical for financial software
@@ -381,6 +390,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 - SOC 2 Type II compliant — important for bank partner discussions
 
 **Alternatives considered:**
+
 - Clerk: Excellent DX but less mature for enterprise SSO/SAML
 - NextAuth: Self-hosted, more control but more maintenance burden
 - Custom auth: Maximum control but massive security risk surface and development time
@@ -390,6 +400,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 **Decision:** Aurora Serverless v2 for the database.
 
 **Rationale:**
+
 - Scales to zero during low-traffic periods (nights/weekends), reducing costs for early-stage
 - Scales up automatically during batch processing (nightly score computation, month-end)
 - Multi-AZ for production reliability
@@ -403,6 +414,7 @@ Financial amounts are the most critical data in the UI. Using a monospace font f
 **Decision:** Zustand for global client state, TanStack Query for server state.
 
 **Rationale:**
+
 - Clear separation: Zustand handles UI state (sidebar collapsed, active organization, modal open). TanStack Query handles server data (transactions, scores, settings).
 - TanStack Query provides automatic caching, revalidation, optimistic updates, and infinite scroll — all critical for the transaction feed.
 - Zustand is ~1KB gzipped, zero boilerplate compared to Redux.
@@ -529,12 +541,12 @@ Guatemala uses CST (UTC-6) year-round with no daylight saving time. Default time
 
 Key dates that IFA must surface as alerts and gamification triggers:
 
-| Obligation | Frequency | Deadline |
-|---|---|---|
-| IVA filing and payment | Monthly | Within the calendar month following the reporting month |
-| ISR quarterly advance | Quarterly | End of quarter |
-| Annual ISR filing | Annual | March 31 of following year |
-| FEL DTE annulment window | Per-DTE | Within the timeframe established by SAT regulations |
+| Obligation               | Frequency | Deadline                                                |
+| ------------------------ | --------- | ------------------------------------------------------- |
+| IVA filing and payment   | Monthly   | Within the calendar month following the reporting month |
+| ISR quarterly advance    | Quarterly | End of quarter                                          |
+| Annual ISR filing        | Annual    | March 31 of following year                              |
+| FEL DTE annulment window | Per-DTE   | Within the timeframe established by SAT regulations     |
 
 ---
 
@@ -551,13 +563,13 @@ Key dates that IFA must surface as alerts and gamification triggers:
 
 Central American countries share: Spanish language, similar business culture, growing digital adoption, and mandatory electronic invoicing in various stages of rollout.
 
-| Country | E-Invoice System | Status | IFA Adaptation |
-|---|---|---|---|
-| El Salvador | DTE/FEL | Mandatory | New certifier adapters, DTE schema mapping |
-| Honduras | DEI electronic | In rollout | New certifier adapters |
-| Costa Rica | Factura Electrónica | Mandatory | New HACIENDA adapter |
-| Panamá | FE (Factura Electrónica) | Mandatory | New DGI adapter |
-| Nicaragua | DGI electronic | Limited | CSV-first approach |
+| Country     | E-Invoice System         | Status     | IFA Adaptation                             |
+| ----------- | ------------------------ | ---------- | ------------------------------------------ |
+| El Salvador | DTE/FEL                  | Mandatory  | New certifier adapters, DTE schema mapping |
+| Honduras    | DEI electronic           | In rollout | New certifier adapters                     |
+| Costa Rica  | Factura Electrónica      | Mandatory  | New HACIENDA adapter                       |
+| Panamá      | FE (Factura Electrónica) | Mandatory  | New DGI adapter                            |
+| Nicaragua   | DGI electronic           | Limited    | CSV-first approach                         |
 
 ### 13.3 Latin America Third
 
@@ -569,27 +581,27 @@ Brazil (pt-BR) is the largest LATAM market and the first non-Spanish-speaking co
 
 ## 14. Security Decisions — Why Each Measure
 
-| Measure | Threat Mitigated | Rationale |
-|---|---|---|
-| Auth0 (not custom auth) | Credential theft, session hijacking | Auth infrastructure is the highest-stakes security code. Outsourcing to a SOC 2 provider eliminates entire attack surface categories. |
-| KMS-encrypted integration credentials | Credential exposure via database breach | Bank API keys and FEL certifier credentials are the most sensitive data after user passwords. KMS encryption means even a full database dump doesn't expose them. |
-| Immutable audit log | Evidence tampering, regulatory non-compliance | SAT auditors need unmodified history. Append-only logging with no UPDATE/DELETE endpoints makes tampering detectable. |
-| DTE XML hash storage | Document integrity verification | Storing a SHA-256 hash of the original DTE XML alongside the S3 path enables verification that stored documents haven't been modified post-ingestion. |
-| Zod input validation | Injection attacks, malformed data | Validating every API input at the schema level prevents SQL injection (doubly protected by Prisma's parameterized queries) and application-level logic errors. |
-| Row-level tenant isolation | Cross-tenant data leakage | The most critical security property. One business must never see another's data, even through bugs. Prisma middleware enforces this on every query. |
+| Measure                               | Threat Mitigated                              | Rationale                                                                                                                                                         |
+| ------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth0 (not custom auth)               | Credential theft, session hijacking           | Auth infrastructure is the highest-stakes security code. Outsourcing to a SOC 2 provider eliminates entire attack surface categories.                             |
+| KMS-encrypted integration credentials | Credential exposure via database breach       | Bank API keys and FEL certifier credentials are the most sensitive data after user passwords. KMS encryption means even a full database dump doesn't expose them. |
+| Immutable audit log                   | Evidence tampering, regulatory non-compliance | SAT auditors need unmodified history. Append-only logging with no UPDATE/DELETE endpoints makes tampering detectable.                                             |
+| DTE XML hash storage                  | Document integrity verification               | Storing a SHA-256 hash of the original DTE XML alongside the S3 path enables verification that stored documents haven't been modified post-ingestion.             |
+| Zod input validation                  | Injection attacks, malformed data             | Validating every API input at the schema level prevents SQL injection (doubly protected by Prisma's parameterized queries) and application-level logic errors.    |
+| Row-level tenant isolation            | Cross-tenant data leakage                     | The most critical security property. One business must never see another's data, even through bugs. Prisma middleware enforces this on every query.               |
 
 ---
 
 ## 15. Gamification Anti-Pattern Analysis
 
-| Anti-Pattern | What It Looks Like | Why IFA Avoids It | IFA's Alternative |
-|---|---|---|---|
-| Pay-to-win | "Buy 500 XP for $5" | Destroys trust in financial software. If XP can be bought, levels are meaningless. Users who notice will question the product's integrity. | XP earned only through real financial actions. |
-| Punitive mechanics | "You lost 50 XP for not logging in" | Creates anxiety and resentment. Financial management should feel empowering, not punishing. | Streaks are the only loss mechanic, and streak freezes mitigate unfair losses. |
-| Forced social comparison | "Company X has a higher score than you" | Financial data is deeply private. Comparing companies directly could expose competitive intelligence or shame struggling businesses. | Anonymous percentile ranking only. "Top 15% of retail businesses." No names, no data. |
-| Notification spam | "You haven't logged in today! Your streak is at risk!" × 5 times | Annoying users who are already busy running businesses. Undermines the tool's professional image. | One daily streak reminder (if enabled), one weekly digest. User controls all notification preferences. |
-| Gamification gates | "Reach Level 3 to unlock reports" | Blocking core financial functionality behind arbitrary gamification milestones is unethical for a business tool. | All features available from day one. Gamification is an overlay, not a gate. |
-| Vanity metrics | "You've processed 10,000 data points!" | Meaningless numbers that inflate engagement metrics but provide no business value to the user. | Every gamification metric ties to a real business outcome: reconciled transactions, on-time closings, score improvements. |
+| Anti-Pattern             | What It Looks Like                                               | Why IFA Avoids It                                                                                                                          | IFA's Alternative                                                                                                         |
+| ------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Pay-to-win               | "Buy 500 XP for $5"                                              | Destroys trust in financial software. If XP can be bought, levels are meaningless. Users who notice will question the product's integrity. | XP earned only through real financial actions.                                                                            |
+| Punitive mechanics       | "You lost 50 XP for not logging in"                              | Creates anxiety and resentment. Financial management should feel empowering, not punishing.                                                | Streaks are the only loss mechanic, and streak freezes mitigate unfair losses.                                            |
+| Forced social comparison | "Company X has a higher score than you"                          | Financial data is deeply private. Comparing companies directly could expose competitive intelligence or shame struggling businesses.       | Anonymous percentile ranking only. "Top 15% of retail businesses." No names, no data.                                     |
+| Notification spam        | "You haven't logged in today! Your streak is at risk!" × 5 times | Annoying users who are already busy running businesses. Undermines the tool's professional image.                                          | One daily streak reminder (if enabled), one weekly digest. User controls all notification preferences.                    |
+| Gamification gates       | "Reach Level 3 to unlock reports"                                | Blocking core financial functionality behind arbitrary gamification milestones is unethical for a business tool.                           | All features available from day one. Gamification is an overlay, not a gate.                                              |
+| Vanity metrics           | "You've processed 10,000 data points!"                           | Meaningless numbers that inflate engagement metrics but provide no business value to the user.                                             | Every gamification metric ties to a real business outcome: reconciled transactions, on-time closings, score improvements. |
 
 ---
 
@@ -603,12 +615,12 @@ Features are prioritized using the ICE framework adapted for IFA's context:
 
 **Priority levels:**
 
-| Priority | Definition | Target |
-|---|---|---|
-| P0 | Core product. Without these, IFA has no value proposition. | MVP launch |
-| P1 | Significant enhancement. Improves retention, score accuracy, or user experience materially. | First 90 days post-launch |
-| P2 | Nice-to-have. Adds depth or delight but doesn't block adoption. | 6 months post-launch |
-| P3 | Future vision. Requires scale or market validation before investment. | 12+ months post-launch |
+| Priority | Definition                                                                                  | Target                    |
+| -------- | ------------------------------------------------------------------------------------------- | ------------------------- |
+| P0       | Core product. Without these, IFA has no value proposition.                                  | MVP launch                |
+| P1       | Significant enhancement. Improves retention, score accuracy, or user experience materially. | First 90 days post-launch |
+| P2       | Nice-to-have. Adds depth or delight but doesn't block adoption.                             | 6 months post-launch      |
+| P3       | Future vision. Requires scale or market validation before investment.                       | 12+ months post-launch    |
 
 ---
 
@@ -618,38 +630,38 @@ Features are prioritized using the ICE framework adapted for IFA's context:
 
 The gamification system is not a separate feature — it's a retention engine. Each gamification mechanic maps to a revenue-relevant behavior:
 
-| Mechanic | Behavior Driven | Revenue Impact |
-|---|---|---|
-| Streaks | Daily login and engagement | Reduces churn. Active users don't cancel. |
-| XP for reconciliation | Using the core product feature | Increases perceived value. "I'm getting my money's worth." |
-| Missions | Using advanced features (reports, rules, AI insights) | Drives adoption of premium-tier features, justifying plan upgrades. |
-| Financial Health Score | Monitoring and improving financial management | Creates a quantified dependency: "My score is 780 because of IFA. Without IFA, I don't know where I stand." |
-| Industry leaderboard | Competitive motivation to improve | Drives engagement with premium analytics to see how to improve ranking. |
+| Mechanic               | Behavior Driven                                       | Revenue Impact                                                                                              |
+| ---------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Streaks                | Daily login and engagement                            | Reduces churn. Active users don't cancel.                                                                   |
+| XP for reconciliation  | Using the core product feature                        | Increases perceived value. "I'm getting my money's worth."                                                  |
+| Missions               | Using advanced features (reports, rules, AI insights) | Drives adoption of premium-tier features, justifying plan upgrades.                                         |
+| Financial Health Score | Monitoring and improving financial management         | Creates a quantified dependency: "My score is 780 because of IFA. Without IFA, I don't know where I stand." |
+| Industry leaderboard   | Competitive motivation to improve                     | Drives engagement with premium analytics to see how to improve ranking.                                     |
 
 ### 17.2 Pricing Tier Alignment
 
 The scaffolding's pricing (GTQ 100-300/month) segments naturally by feature depth:
 
-| Tier | Price (GTQ/month) | Key Features | Gamification Access |
-|---|---|---|---|
-| Starter | ~100 | FEL ingestion, basic reconciliation, 1 user, basic reports | Streaks, XP, basic badges, basic missions |
-| Professional | ~200 | + AI insights, advanced reports, 3 users, QuickBooks export, accounting rules | + Full missions, industry leaderboard, all badges |
-| Enterprise | ~300 | + Multi-entity, unlimited users, API access, white-label for accounting firms, priority support | + Cross-entity gamification, team leaderboards |
+| Tier         | Price (GTQ/month) | Key Features                                                                                    | Gamification Access                               |
+| ------------ | ----------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Starter      | ~100              | FEL ingestion, basic reconciliation, 1 user, basic reports                                      | Streaks, XP, basic badges, basic missions         |
+| Professional | ~200              | + AI insights, advanced reports, 3 users, QuickBooks export, accounting rules                   | + Full missions, industry leaderboard, all badges |
+| Enterprise   | ~300              | + Multi-entity, unlimited users, API access, white-label for accounting firms, priority support | + Cross-entity gamification, team leaderboards    |
 
 ---
 
 ## 18. Risk Register
 
-| Risk | Probability | Impact | Mitigation |
-|---|---|---|---|
-| FEL certifier API access denied or rate-limited | Medium | High | Adapter pattern allows switching certifiers. SFTP/CSV fallback. Multiple certifier relationships. |
-| Bank partnership delays (API access) | High | Medium | CSV upload available from day one. SFTP as intermediate step. Bank partnerships are a growth accelerator, not a blocker. |
-| SME owners find gamification patronizing | Low | Medium | Gamification is subtle and opt-outable. Core product works without engaging with XP/streaks. User research during beta will calibrate. |
-| Financial Health Score perceived as meaningless | Medium | High | Heavy investment in score explanation (factor breakdown, trend charts, AI-generated improvement actions). Score must be actionable, not just a number. |
-| Claude API costs escalate with scale | Medium | Medium | Cache AI categorizations. Once a merchant is categorized, the same category applies to future transactions from that merchant without re-calling the API. Batch processing during off-peak. |
-| Competitor enters market (large player like Xero or QuickBooks adding FEL support) | Low-Medium | High | IFA's moat is local integration depth (FEL certifier adapters, Guatemalan bank partnerships, NIIF-PYME templates) and gamification layer. Network effects from accounting firm channel create switching costs. |
-| Data breach | Low | Critical | Defense in depth: Auth0, KMS, row-level isolation, encrypted at rest, audit trails. Breach response plan required before launch. |
-| SAT regulatory changes | Medium | Medium | Country adapter pattern isolates regulatory logic. Changes affect adapters, not core. Active monitoring of SAT communications. |
+| Risk                                                                               | Probability | Impact   | Mitigation                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------- | ----------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FEL certifier API access denied or rate-limited                                    | Medium      | High     | Adapter pattern allows switching certifiers. SFTP/CSV fallback. Multiple certifier relationships.                                                                                                              |
+| Bank partnership delays (API access)                                               | High        | Medium   | CSV upload available from day one. SFTP as intermediate step. Bank partnerships are a growth accelerator, not a blocker.                                                                                       |
+| SME owners find gamification patronizing                                           | Low         | Medium   | Gamification is subtle and opt-outable. Core product works without engaging with XP/streaks. User research during beta will calibrate.                                                                         |
+| Financial Health Score perceived as meaningless                                    | Medium      | High     | Heavy investment in score explanation (factor breakdown, trend charts, AI-generated improvement actions). Score must be actionable, not just a number.                                                         |
+| Claude API costs escalate with scale                                               | Medium      | Medium   | Cache AI categorizations. Once a merchant is categorized, the same category applies to future transactions from that merchant without re-calling the API. Batch processing during off-peak.                    |
+| Competitor enters market (large player like Xero or QuickBooks adding FEL support) | Low-Medium  | High     | IFA's moat is local integration depth (FEL certifier adapters, Guatemalan bank partnerships, NIIF-PYME templates) and gamification layer. Network effects from accounting firm channel create switching costs. |
+| Data breach                                                                        | Low         | Critical | Defense in depth: Auth0, KMS, row-level isolation, encrypted at rest, audit trails. Breach response plan required before launch.                                                                               |
+| SAT regulatory changes                                                             | Medium      | Medium   | Country adapter pattern isolates regulatory logic. Changes affect adapters, not core. Active monitoring of SAT communications.                                                                                 |
 
 ---
 
@@ -667,15 +679,15 @@ Adapted from Duolingo's onboarding research:
 
 ### 19.2 Step-by-Step Rationale
 
-| Step | What's Collected | Why This Step | Why This Order |
-|---|---|---|---|
-| 1: Empresa | Name, NIT, industry, FEL certifier | Creates the Organization tenant. NIT is required for FEL lookup. Industry is needed for leaderboard segmentation. | Must be first: can't do anything without a tenant. |
-| 2: Integraciones | FEL API credentials, optional CSV | Connects the primary data source. This is where value starts. | Immediately after tenant creation: get data flowing ASAP. |
-| 3: Reglas | Basic chart of accounts selection, initial rules | Sets up accounting foundation. Pre-loaded NIIF-PYME template means user just confirms, not builds from scratch. | After data is connected: rules need data context. |
-| 4: Equipo | Invite accountant/team (skippable) | Multi-user is a key differentiator. Early invitation increases retention (more people invested = less likely to churn). | After core setup: team isn't needed until the system works. |
-| 5: Meta | First financial goal | Seeds the gamification system. Having a goal makes the Financial Health Score meaningful. | After system is functional: goals need context. |
-| 6: Tour | Interactive walkthrough | Shows key features in the context of the user's own data (not generic screenshots). | Last: the tour is most meaningful when real data is present. |
+| Step             | What's Collected                                 | Why This Step                                                                                                           | Why This Order                                               |
+| ---------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 1: Empresa       | Name, NIT, industry, FEL certifier               | Creates the Organization tenant. NIT is required for FEL lookup. Industry is needed for leaderboard segmentation.       | Must be first: can't do anything without a tenant.           |
+| 2: Integraciones | FEL API credentials, optional CSV                | Connects the primary data source. This is where value starts.                                                           | Immediately after tenant creation: get data flowing ASAP.    |
+| 3: Reglas        | Basic chart of accounts selection, initial rules | Sets up accounting foundation. Pre-loaded NIIF-PYME template means user just confirms, not builds from scratch.         | After data is connected: rules need data context.            |
+| 4: Equipo        | Invite accountant/team (skippable)               | Multi-user is a key differentiator. Early invitation increases retention (more people invested = less likely to churn). | After core setup: team isn't needed until the system works.  |
+| 5: Meta          | First financial goal                             | Seeds the gamification system. Having a goal makes the Financial Health Score meaningful.                               | After system is functional: goals need context.              |
+| 6: Tour          | Interactive walkthrough                          | Shows key features in the context of the user's own data (not generic screenshots).                                     | Last: the tour is most meaningful when real data is present. |
 
 ---
 
-*End of Definitions & Reasoning Document*
+_End of Definitions & Reasoning Document_
