@@ -52,3 +52,6 @@ supabase/.temp/
 
 # Sentry / source maps (will be gitignored if/when Sentry is added)
 .sentryclirc
+
+# Docs directory kept local; source of truth lives elsewhere.
+docs/
