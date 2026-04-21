@@ -54,4 +54,5 @@ supabase/.temp/
 .sentryclirc
 
 # Docs directory kept local; source of truth lives elsewhere.
+# Operational runbooks live at docs_operations/ (tracked).
 docs/

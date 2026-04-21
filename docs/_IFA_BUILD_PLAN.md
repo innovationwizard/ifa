@@ -539,14 +539,14 @@ Supabase Auth's built-in SMTP covers signup confirmation + password reset. No in
 
 ### S-1.14: Migration deploy procedure documented
 
-**Description:** Document in `docs/operations/migrations.md` the exact procedure to apply migrations to `ifa-prod`: snapshot first, run `prisma migrate deploy`, verify via smoke query, rollback procedure.
+**Description:** Document in `docs_operations/migrations.md` the exact procedure to apply migrations to production: snapshot first, run `prisma migrate deploy`, verify via smoke query, rollback procedure.
 **Acceptance criteria:**
 
-- [ ] Procedure rehearsed once on `ifa-dev`
+- [ ] Procedure rehearsed once on a throwaway copy of the DB
 - [ ] Doc reviewed by you before any prod migration
       **Dependencies:** S-1.11
       **Complexity:** S
-      **Files:** `docs/operations/migrations.md`
+      **Files:** `docs_operations/migrations.md`
 
 ---
 
@@ -1764,14 +1764,14 @@ Supabase Auth's built-in SMTP covers signup confirmation + password reset. No in
 
 ### S-11.7: Operations runbook
 
-**Description:** `docs/operations/runbook.md` covering: incident triage, rollback, DB restore, Vercel redeploy, Supabase issue escalation paths.
+**Description:** `docs_operations/runbook.md` covering: incident triage, rollback, DB restore, Vercel redeploy, Supabase issue escalation paths.
 **Acceptance criteria:**
 
 - [ ] Each procedure has a step-by-step checklist
-- [ ] Rollback rehearsed once on `ifa-dev`
+- [ ] Rollback rehearsed once on a throwaway copy of the DB
       **Dependencies:** S-11.1
       **Complexity:** M
-      **Files:** `docs/operations/runbook.md`
+      **Files:** `docs_operations/runbook.md`
 
 ### S-11.8: Pre-launch legal checklist
 
