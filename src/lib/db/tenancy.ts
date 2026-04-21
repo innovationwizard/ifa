@@ -6,15 +6,15 @@ import { getTenantContext, requireTenant } from './tenant-context';
  *
  * Shape of the filter injection, per operation kind:
  *   - Reads (findFirst, findMany, count, aggregate, groupBy):
- *       add `organizationId` to args.where
+ *       add `profileId` to args.where
  *   - findUnique / findUniqueOrThrow:
  *       unique `where` cannot hold non-unique filters; we transform the
  *       call into findFirst under the hood so we can append the tenant
  *       constraint. The caller receives identical data.
  *   - Mutations with where (update, updateMany, delete, deleteMany):
- *       add `organizationId` to args.where
+ *       add `profileId` to args.where
  *   - Creates (create, createMany, upsert, createManyAndReturn):
- *       inject `organizationId` into args.data if missing; if present
+ *       inject `profileId` into args.data if missing; if present
  *       and mismatched, throw — caller clearly confused tenants.
  *
  * Non-tenant models (User, Badge, Mission) are NOT intercepted and may
@@ -32,7 +32,7 @@ import { getTenantContext, requireTenant } from './tenant-context';
  * S-1.10).
  */
 export const TENANT_SCOPED_MODELS = new Set<string>([
-  'OrganizationMember',
+  'ProfileMember',
   'Transaction',
   'Reconciliation',
   'Account',
@@ -68,43 +68,43 @@ const FIND_UNIQUE_OPERATIONS = new Set<string>(['findUnique', 'findUniqueOrThrow
 
 const CREATE_OPERATIONS = new Set<string>(['create', 'createMany', 'createManyAndReturn']);
 
-type WhereArg = Record<string, unknown> & { organizationId?: string };
-type DataArg = Record<string, unknown> & { organizationId?: string };
+type WhereArg = Record<string, unknown> & { profileId?: string };
+type DataArg = Record<string, unknown> & { profileId?: string };
 interface OpArgs {
   where?: WhereArg;
   data?: DataArg | DataArg[];
 }
 
-function withTenantWhere(where: WhereArg | undefined, organizationId: string): WhereArg {
-  if (!where) return { organizationId };
-  if (where.organizationId && where.organizationId !== organizationId) {
+function withTenantWhere(where: WhereArg | undefined, profileId: string): WhereArg {
+  if (!where) return { profileId };
+  if (where.profileId && where.profileId !== profileId) {
     throw new Error(
-      `Cross-tenant query attempt blocked: where.organizationId=${String(where.organizationId)} ` +
-        `but current context organizationId=${organizationId}`,
+      `Cross-tenant query attempt blocked: where.profileId=${String(where.profileId)} ` +
+        `but current context profileId=${profileId}`,
     );
   }
-  return { ...where, organizationId };
+  return { ...where, profileId };
 }
 
 function withTenantData(
   data: DataArg | DataArg[] | undefined,
-  organizationId: string,
+  profileId: string,
 ): DataArg | DataArg[] | undefined {
   if (!data) return data;
   if (Array.isArray(data)) {
-    return data.map((row) => withTenantDataSingle(row, organizationId));
+    return data.map((row) => withTenantDataSingle(row, profileId));
   }
-  return withTenantDataSingle(data, organizationId);
+  return withTenantDataSingle(data, profileId);
 }
 
-function withTenantDataSingle(data: DataArg, organizationId: string): DataArg {
-  if (data.organizationId && data.organizationId !== organizationId) {
+function withTenantDataSingle(data: DataArg, profileId: string): DataArg {
+  if (data.profileId && data.profileId !== profileId) {
     throw new Error(
-      `Cross-tenant create attempt blocked: data.organizationId=${String(data.organizationId)} ` +
-        `but current context organizationId=${organizationId}`,
+      `Cross-tenant create attempt blocked: data.profileId=${String(data.profileId)} ` +
+        `but current context profileId=${profileId}`,
     );
   }
-  return { ...data, organizationId };
+  return { ...data, profileId };
 }
 
 /**
@@ -128,17 +128,17 @@ export const tenancyExtension = Prisma.defineExtension({
         const typedArgs = args as OpArgs;
 
         if (READ_OPERATIONS_WITH_WHERE.has(operation)) {
-          typedArgs.where = withTenantWhere(typedArgs.where, ctx.organizationId);
+          typedArgs.where = withTenantWhere(typedArgs.where, ctx.profileId);
           return query(typedArgs);
         }
 
         if (MUTATION_OPERATIONS_WITH_WHERE.has(operation)) {
-          typedArgs.where = withTenantWhere(typedArgs.where, ctx.organizationId);
+          typedArgs.where = withTenantWhere(typedArgs.where, ctx.profileId);
           return query(typedArgs);
         }
 
         if (CREATE_OPERATIONS.has(operation)) {
-          const withData = withTenantData(typedArgs.data, ctx.organizationId);
+          const withData = withTenantData(typedArgs.data, ctx.profileId);
           if (withData !== undefined) {
             typedArgs.data = withData;
           }
@@ -151,16 +151,16 @@ export const tenancyExtension = Prisma.defineExtension({
             create: DataArg;
             update: DataArg;
           };
-          upsertArgs.where = withTenantWhere(upsertArgs.where, ctx.organizationId);
-          upsertArgs.create = withTenantDataSingle(upsertArgs.create, ctx.organizationId);
-          upsertArgs.update = withTenantDataSingle(upsertArgs.update, ctx.organizationId);
+          upsertArgs.where = withTenantWhere(upsertArgs.where, ctx.profileId);
+          upsertArgs.create = withTenantDataSingle(upsertArgs.create, ctx.profileId);
+          upsertArgs.update = withTenantDataSingle(upsertArgs.update, ctx.profileId);
           return query(upsertArgs);
         }
 
         if (FIND_UNIQUE_OPERATIONS.has(operation)) {
           /*
            * findUnique's `where` accepts only unique key fields, so we
-           * cannot append `organizationId` to it directly. Transform
+           * cannot append `profileId` to it directly. Transform
            * the call to findFirst internally — the extra filter makes
            * the query uniqueness-safe because a unique-key collision
            * across tenants still returns at most one row after filter.
@@ -170,7 +170,7 @@ export const tenancyExtension = Prisma.defineExtension({
            * relations which stay within-tenant via their own paths.
            */
           const uniqueArgs = args as { where: WhereArg } & Record<string, unknown>;
-          uniqueArgs.where = withTenantWhere(uniqueArgs.where, ctx.organizationId);
+          uniqueArgs.where = withTenantWhere(uniqueArgs.where, ctx.profileId);
           // Narrow the operation to its findFirst equivalent
           const targetOp = operation === 'findUnique' ? 'findFirst' : 'findFirstOrThrow';
           // Delegate to the typed query by routing through a raw call.

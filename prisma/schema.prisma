@@ -30,10 +30,12 @@ datasource db {
 // S-1.3 — Identity & tenancy
 // =============================================================================
 
-/// Membership role per scaffolding §3. OrganizationMember ties a User to an
-/// Organization with a specific role. Canal Contable (one user across many
-/// orgs) is deferred per locked H, but the model already supports it so
-/// activation is a UI change, not a schema migration.
+/// Membership role per scaffolding §3. ProfileMember ties a User to a
+/// Profile with a specific role. For the common INDIVIDUAL-tier case
+/// there is exactly one member (OWNER). Multi-member Profiles are
+/// relevant to BUSINESS tier (team accounts) and to the future Canal
+/// Contable (one user across many profiles) which is deferred per
+/// locked H — the model supports activation without a schema migration.
 enum MemberRole {
   OWNER
   ADMIN
@@ -41,24 +43,28 @@ enum MemberRole {
   VIEWER
 }
 
-/// SAT fiscal regimes relevant to MVP scope (MIPYME-focused).
-/// `GENERAL` and `PEQUENIO_CONTRIBUYENTE` cover > 95% of the target market
-/// per PDF §4. Additional regimes (Agropecuario, Profesionales Simplificado,
-/// etc.) can be appended without data migration since Prisma enums are
-/// additive at the DB level when new values are declared last.
+/// Profile tier. INDIVIDUAL is the default — every new user lands here and
+/// gets the Credit Karma-style personal-finance cockpit. BUSINESS is a
+/// proactive opt-in upgrade that unlocks the MIPYME surfaces (NIT, FEL
+/// issuance, TPV ingestion, chart of accounts, accounting rules engine,
+/// IVA reporting, QuickBooks export). Locked in `project_audience.md`.
+enum ProfileType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+/// SAT fiscal regimes. Optional on every Profile; relevant to BUSINESS tier
+/// and to INDIVIDUAL users who proactively turn on advanced tax tracking.
+/// Additional regimes can be appended without data migration since Prisma
+/// enums are additive at the DB level when new values are declared last.
 enum FiscalRegime {
   GENERAL
   PEQUENIO_CONTRIBUYENTE
 }
 
-/// IndustryType is used for:
-///   (a) onboarding segmentation (UX flows)
-///   (b) anonymous leaderboard cohort grouping (§9.1.6)
-///
-/// Seed set covers the PDF's stated target markets (§4): comercios
-/// minoristas, restaurantes y servicios, servicios profesionales. `OTHER`
-/// is a deliberate catch-all — new values land here via migration when the
-/// first pilot reveals demand for finer grain.
+/// Industry / occupation classifier — used for BUSINESS-tier segmentation
+/// (industry leaderboard cohort, §9.1.6) and optional INDIVIDUAL occupation
+/// labeling. Optional on Profile.
 enum IndustryType {
   RETAIL
   RESTAURANT
@@ -75,19 +81,51 @@ enum SubscriptionTier {
   ENTERPRISE
 }
 
-/// A single legal entity (NIT) managed inside IFA — the tenant boundary.
-/// Every tenant-scoped table carries an `organizationId` that the Prisma
-/// middleware from S-1.8 will auto-filter on every query.
-model Organization {
-  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  /// Guatemalan NIT with check digit. Validated at the application layer
-  /// via `src/lib/validators/nit.ts` (S-2.8). Unique because a NIT maps 1:1
-  /// to a legal entity in SAT's records.
-  nit                 String           @unique
-  name                String
-  industryType        IndustryType
-  fiscalRegime        FiscalRegime
-  logoUrl             String?
+/// The tenant boundary. Every tenant-scoped table carries a `profileId`
+/// that the Prisma middleware from S-1.8 auto-filters on every query.
+///
+/// Two types (`ProfileType`) share this table:
+///   - INDIVIDUAL (default) — a person using IFA as a personal-finance
+///     cockpit. `displayName`, `dpiNumber`, `dpiPhotoPath`, `dateOfBirth`
+///     carry the person's identity. NIT / fiscal regime / industry are
+///     all optional and only surface when the user enables advanced
+///     tax tracking.
+///   - BUSINESS — a MIPYME managed inside IFA. NIT typically populated;
+///     fiscal regime + industry typically populated. Still technically
+///     optional to allow in-place upgrades before the user fills them in.
+///
+/// Identity: `id` is IFA-generated UUIDv7 (time-ordered). `User.id`
+/// remains a Supabase Auth UUIDv4. NIT is optional and never used as a
+/// lookup key — see `project_core_thesis.md` memory.
+model Profile {
+  id   String      @id @default(uuid(7)) @db.Uuid
+  type ProfileType @default(INDIVIDUAL)
+
+  // --- Identity (typically INDIVIDUAL) --------------------------------
+  /// Human-readable handle. For INDIVIDUAL: the person's name as they
+  /// want it displayed. For BUSINESS: the legal or trade name.
+  displayName  String
+  /// Guatemala DPI (CUI) — 13 digits. Optional metadata. Stored for
+  /// reference only; never validated, never used as a lookup key.
+  dpiNumber    String?
+  /// Supabase Storage path for the DPI photo upload (`dpi/{profileId}/front.jpg`),
+  /// if the user chose to upload rather than type the number.
+  dpiPhotoPath String?
+  /// Used for optional features like age-adjusted score factors and
+  /// compliance reporting.
+  dateOfBirth  DateTime? @db.Date
+
+  // --- Business-only (required UI only when type = BUSINESS) ----------
+  /// Guatemalan NIT. Optional at the schema level because INDIVIDUAL
+  /// profiles may never populate it, and BUSINESS profiles may exist
+  /// briefly before the user fills it in. When present, it is unique —
+  /// Prisma allows multiple NULLs but enforces uniqueness on non-NULLs.
+  nit          String?       @unique
+  industryType IndustryType?
+  fiscalRegime FiscalRegime?
+  logoUrl      String?
+
+  // --- Defaults -------------------------------------------------------
   /// ISO 4217 currency code. GTQ default; USD-parallel accounts can still
   /// hold USD-denominated transactions via per-transaction currency fields.
   currency            String           @default("GTQ")
@@ -98,10 +136,11 @@ model Organization {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
-  members OrganizationMember[]
+  members ProfileMember[]
 
+  @@index([type])
   @@index([nit])
-  @@map("organizations")
+  @@map("profiles")
 }
 
 /// Application user. Identity lives in Supabase Auth (locked D-3); this
@@ -122,31 +161,33 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships OrganizationMember[]
+  memberships ProfileMember[]
 
   @@index([email])
   @@map("users")
 }
 
-/// Join table between User and Organization with a role. One User can
-/// belong to multiple Organizations (Canal Contable support, §3); the UI
-/// to switch between them is deferred per locked H but the model supports
-/// the activation.
-model OrganizationMember {
-  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String     @db.Uuid
-  userId         String     @db.Uuid
-  role           MemberRole
-  invitedAt      DateTime   @default(now())
-  joinedAt       DateTime?
+/// Join table between User and Profile with a role. For the default
+/// INDIVIDUAL case this contains exactly one row (the user as OWNER of
+/// their own Profile). Additional rows appear for BUSINESS-tier team
+/// invites and for Canal Contable (one user across many profiles —
+/// deferred per locked H but the model supports activation without a
+/// migration).
+model ProfileMember {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  profileId String     @db.Uuid
+  userId    String     @db.Uuid
+  role      MemberRole
+  invitedAt DateTime   @default(now())
+  joinedAt  DateTime?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, userId], name: "uniq_org_user")
-  @@index([organizationId])
+  @@unique([profileId, userId], name: "uniq_profile_user")
+  @@index([profileId])
   @@index([userId])
-  @@map("organization_members")
+  @@map("profile_members")
 }
 
 // =============================================================================
@@ -163,7 +204,7 @@ enum TransactionSource {
   MANUAL
 }
 
-/// Direction of value flow for the owning organization.
+/// Direction of value flow for the owning profile.
 enum TransactionType {
   INCOME
   EXPENSE
@@ -244,11 +285,11 @@ enum CardBrand {
 /// `reconciliationStatus` enum below is the denormalized state so the
 /// transaction list UI (S-3.7) can filter without a join.
 model Transaction {
-  id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId           String               @db.Uuid
+  id                       String               @id @default(uuid(7)) @db.Uuid
+  profileId                String               @db.Uuid
   source                   TransactionSource
   /// Source-specific identifier used to detect re-ingestion. Combined with
-  /// organizationId + source in a unique constraint so duplicate pulls of
+  /// profileId + source in a unique constraint so duplicate pulls of
   /// the same upstream record are caught at insert time.
   externalId               String?
   type                     TransactionType
@@ -257,7 +298,7 @@ model Transaction {
   ivaAmount                Decimal              @default(0) @db.Decimal(14, 2)
   date                     DateTime             @db.Date
   /// Optional time-of-day (BANK_CSV rarely carries it). Stored as a
-  /// zoneless time; combined with `date` under the organization's
+  /// zoneless time; combined with `date` under the profile's
   /// America/Guatemala tz at query time.
   time                     DateTime?            @db.Time
   description              String
@@ -281,17 +322,17 @@ model Transaction {
   felReconciliation Reconciliation?     @relation("ReconciliationFelSide")
   tpvReconciliation Reconciliation?     @relation("ReconciliationTpvSide")
 
-  @@unique([organizationId, source, externalId], name: "uniq_org_source_external")
-  @@index([organizationId, date(sort: Desc)])
-  @@index([organizationId, reconciliationStatus])
-  @@index([organizationId, source])
+  @@unique([profileId, source, externalId], name: "uniq_profile_source_external")
+  @@index([profileId, date(sort: Desc)])
+  @@index([profileId, reconciliationStatus])
+  @@index([profileId, source])
   /// Scaffolding Appendix B specifies this as a partial index
   /// (`WHERE "merchantNit" IS NOT NULL`). Prisma cannot express partial
   /// indexes via `@@index`; the full index here functions identically
   /// in correctness terms. Convert to partial in the formal migration
   /// transition (S-1.14) alongside the pg_trgm GIN index for search.
   @@index([merchantNit])
-  @@index([organizationId, amount, date, source])
+  @@index([profileId, amount, date, source])
   @@map("transactions")
 }
 
@@ -299,7 +340,7 @@ model Transaction {
 /// separate so the main transaction table stays narrow for paginated list
 /// queries — most reads don't need the XML path or line items.
 model FelDteData {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                String   @id @default(uuid(7)) @db.Uuid
   transactionId     String   @unique @db.Uuid
   /// SAT's UUID for the DTE (not the IFA row UUID). Required to be unique
   /// at the SAT level; enforced here so double-ingest is impossible.
@@ -312,7 +353,7 @@ model FelDteData {
   certifierName     String
   certificationDate DateTime
   /// Supabase Storage path for the original XML. Stored as
-  /// `fel-xml/{organizationId}/{dteUuid}.xml`. SHA-256 hash of the file
+  /// `fel-xml/{profileId}/{dteUuid}.xml`. SHA-256 hash of the file
   /// kept in `rawPayload.xmlHash` for tamper detection (scaffolding §14).
   xmlStoragePath    String?
   /// Array of line items as-emitted by the certifier.
@@ -329,7 +370,7 @@ model FelDteData {
 
 /// TPV/acquirer sidecar table. 1:1 with Transaction where `source = TPV`.
 model TpvTransactionData {
-  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                String       @id @default(uuid(7)) @db.Uuid
   transactionId     String       @unique @db.Uuid
   acquirer          AcquirerCode
   authorizationCode String?
@@ -357,8 +398,8 @@ model TpvTransactionData {
 /// transaction can participate in at most one reconciliation, and
 /// unmatching (S-4.5) deletes the row.
 model Reconciliation {
-  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId   String                  @db.Uuid
+  id               String                  @id @default(uuid(7)) @db.Uuid
+  profileId        String                  @db.Uuid
   felTransactionId String                  @unique @db.Uuid
   tpvTransactionId String                  @unique @db.Uuid
   matchType        ReconciliationMatchType
@@ -376,7 +417,7 @@ model Reconciliation {
   felTransaction Transaction @relation("ReconciliationFelSide", fields: [felTransactionId], references: [id], onDelete: Cascade)
   tpvTransaction Transaction @relation("ReconciliationTpvSide", fields: [tpvTransactionId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId, reconciledAt(sort: Desc)])
+  @@index([profileId, reconciledAt(sort: Desc)])
   @@index([matchType])
   @@map("reconciliations")
 }
@@ -426,7 +467,7 @@ enum PeriodStatus {
 }
 
 /// Chart of accounts node. Seeded from the NIIF-PYME template (S-1.11)
-/// on organization creation. `parentId` forms the tree; leaves hold
+/// on profile creation. `parentId` forms the tree; leaves hold
 /// actual postings while interior nodes aggregate.
 ///
 /// `balance` is cached and updated transactionally with each posting
@@ -436,8 +477,8 @@ enum PeriodStatus {
 /// `isSystemAccount = true` for seeded NIIF-PYME accounts prevents
 /// accidental deletion. Org-created accounts default to false.
 model Account {
-  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId  String      @db.Uuid
+  id              String      @id @default(uuid(7)) @db.Uuid
+  profileId       String      @db.Uuid
   /// Account code — opaque identifier from the chart of accounts
   /// (e.g., "1101" for Cash, "5201" for Fuel Expense). Unique within
   /// the org so journal rules can reference it stably.
@@ -447,7 +488,7 @@ model Account {
   parentId        String?     @db.Uuid
   isActive        Boolean     @default(true)
   isSystemAccount Boolean     @default(false)
-  /// Cached running balance in the organization's default currency.
+  /// Cached running balance in the profile's default currency.
   /// Updated atomically with each JournalEntryLine insert (S-5.2).
   balance         Decimal     @default(0) @db.Decimal(18, 2)
   createdAt       DateTime    @default(now())
@@ -457,33 +498,33 @@ model Account {
   children Account[]          @relation("AccountParent")
   lines    JournalEntryLine[]
 
-  @@unique([organizationId, code], name: "uniq_org_account_code")
-  @@index([organizationId, type])
-  @@index([organizationId, isActive])
+  @@unique([profileId, code], name: "uniq_profile_account_code")
+  @@index([profileId, type])
+  @@index([profileId, isActive])
   @@index([parentId])
   @@map("accounts")
 }
 
-/// A single accounting period (year + month) owned by an organization.
+/// A single accounting period (year + month) owned by an profile.
 /// Creation is lazy — periods are inserted the first time a journal
 /// entry falls into that month, or explicitly by the UI (S-5.7).
 model AccountingPeriod {
-  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String       @db.Uuid
-  year           Int
-  month          Int
-  status         PeriodStatus @default(OPEN)
-  closedAt       DateTime?
-  closedBy       String?      @db.Uuid
-  lockedAt       DateTime?
-  lockedBy       String?      @db.Uuid
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id        String       @id @default(uuid(7)) @db.Uuid
+  profileId String       @db.Uuid
+  year      Int
+  month     Int
+  status    PeriodStatus @default(OPEN)
+  closedAt  DateTime?
+  closedBy  String?      @db.Uuid
+  lockedAt  DateTime?
+  lockedBy  String?      @db.Uuid
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   journalEntries JournalEntry[]
 
-  @@unique([organizationId, year, month], name: "uniq_org_period")
-  @@index([organizationId, status])
+  @@unique([profileId, year, month], name: "uniq_profile_period")
+  @@index([profileId, status])
   @@map("accounting_periods")
 }
 
@@ -499,8 +540,8 @@ model AccountingPeriod {
 /// `reversedEntryId` points at the entry this one reverses (if any).
 /// Reversals cannot themselves be reversed (enforced in the service).
 model JournalEntry {
-  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId      String             @db.Uuid
+  id                  String             @id @default(uuid(7)) @db.Uuid
+  profileId           String             @db.Uuid
   entryNumber         Int
   date                DateTime           @db.Date
   description         String
@@ -519,10 +560,10 @@ model JournalEntry {
   reversedBy    JournalEntry?      @relation("JournalEntryReversal")
   lines         JournalEntryLine[]
 
-  @@unique([organizationId, entryNumber], name: "uniq_org_entry_number")
-  @@index([organizationId, periodId])
-  @@index([organizationId, date(sort: Desc)])
-  @@index([organizationId, status])
+  @@unique([profileId, entryNumber], name: "uniq_profile_entry_number")
+  @@index([profileId, periodId])
+  @@index([profileId, date(sort: Desc)])
+  @@index([profileId, status])
   @@index([sourceTransactionId])
   @@map("journal_entries")
 }
@@ -535,7 +576,7 @@ model JournalEntry {
 /// state on that transaction can surface its posting history. No cascade
 /// on Transaction deletion — accounting records outlive their source.
 model JournalEntryLine {
-  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id             String  @id @default(uuid(7)) @db.Uuid
   journalEntryId String  @db.Uuid
   accountId      String  @db.Uuid
   debitAmount    Decimal @default(0) @db.Decimal(18, 2)
@@ -568,21 +609,21 @@ model JournalEntryLine {
 ///
 /// `priority` determines firing order; first matching rule wins (S-5.4).
 model AccountingRule {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @db.Uuid
-  name           String
-  priority       Int      @default(100)
-  isActive       Boolean  @default(true)
-  conditions     Json     @db.JsonB
-  actions        Json     @db.JsonB
+  id         String   @id @default(uuid(7)) @db.Uuid
+  profileId  String   @db.Uuid
+  name       String
+  priority   Int      @default(100)
+  isActive   Boolean  @default(true)
+  conditions Json     @db.JsonB
+  actions    Json     @db.JsonB
   /// Count of times this rule has fired — useful for the rule
   /// analytics UI and for detecting dead rules.
-  matchCount     Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  matchCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@index([organizationId, priority])
-  @@index([organizationId, isActive])
+  @@index([profileId, priority])
+  @@index([profileId, isActive])
   @@map("accounting_rules")
 }
 
@@ -608,7 +649,7 @@ enum HealthScoreActionStatus {
   DISMISSED
 }
 
-/// A snapshot of the Financial Health Score for an organization at a
+/// A snapshot of the Financial Health Score for an profile at a
 /// moment in time. `previousScore` is carried forward so delta visualization
 /// (dashboard gauge trend arrow) does not need a second query.
 ///
@@ -616,18 +657,18 @@ enum HealthScoreActionStatus {
 /// factor name. Schema is documented in
 /// src/lib/intelligence/health-score/README.md (S-7.11).
 model HealthScore {
-  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String            @db.Uuid
-  score          Int
-  previousScore  Int?
-  factors        Json              @db.JsonB
-  computedAt     DateTime          @default(now())
-  period         HealthScorePeriod
-  metadata       Json              @default("{}") @db.JsonB
+  id            String            @id @default(uuid(7)) @db.Uuid
+  profileId     String            @db.Uuid
+  score         Int
+  previousScore Int?
+  factors       Json              @db.JsonB
+  computedAt    DateTime          @default(now())
+  period        HealthScorePeriod
+  metadata      Json              @default("{}") @db.JsonB
 
   actions HealthScoreAction[]
 
-  @@index([organizationId, computedAt(sort: Desc)])
+  @@index([profileId, computedAt(sort: Desc)])
   @@map("health_scores")
 }
 
@@ -635,8 +676,8 @@ model HealthScore {
 /// `estimatedImpact` is a projected point delta (positive or negative)
 /// used to rank the list shown on the score detail page (S-7.15).
 model HealthScoreAction {
-  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId  String                  @db.Uuid
+  id              String                  @id @default(uuid(7)) @db.Uuid
+  profileId       String                  @db.Uuid
   healthScoreId   String                  @db.Uuid
   actionType      String
   description     String
@@ -648,7 +689,7 @@ model HealthScoreAction {
 
   healthScore HealthScore @relation(fields: [healthScoreId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId, status])
+  @@index([profileId, status])
   @@index([healthScoreId])
   @@map("health_score_actions")
 }
@@ -708,8 +749,8 @@ enum UserMissionStatus {
 /// which the user triggered a streak-extending action. The streak cron
 /// (S-8.4) reads this to decide whether to break or consume a freeze.
 model GamificationProfile {
-  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId        String    @db.Uuid
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  profileId             String    @db.Uuid
   userId                String    @db.Uuid
   totalXp               BigInt    @default(0)
   level                 Int       @default(1)
@@ -724,8 +765,8 @@ model GamificationProfile {
   badges   UserBadge[]
   missions UserMission[]
 
-  @@unique([organizationId, userId], name: "uniq_org_user_gamification")
-  @@index([organizationId, totalXp(sort: Desc)])
+  @@unique([profileId, userId], name: "uniq_profile_user_gamification")
+  @@index([profileId, totalXp(sort: Desc)])
   @@map("gamification_profiles")
 }
 
@@ -736,7 +777,7 @@ model GamificationProfile {
 /// Daily-cap actions (LOGIN_DAILY) are idempotent per (profile, action,
 /// earnedAt::date) via a partial unique index added in S-8.2.
 model XpEvent {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String   @id @default(uuid(7)) @db.Uuid
   gamificationProfileId String   @db.Uuid
   action                XpAction
   xpEarned              Int
@@ -774,7 +815,7 @@ model Badge {
 /// Award record — a user has unlocked a specific badge. Unique so
 /// re-triggering unlock logic (S-8.7 is idempotent) inserts nothing.
 model UserBadge {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String   @id @default(uuid(7)) @db.Uuid
   gamificationProfileId String   @db.Uuid
   badgeId               String
   unlockedAt            DateTime @default(now())
@@ -791,7 +832,7 @@ model UserBadge {
 /// scope narrowing by industry or org size happens inside UserMission
 /// assignment (S-8.6 rotation).
 model Mission {
-  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String      @id @default(uuid(7)) @db.Uuid
   type          MissionType
   name          String
   description   String
@@ -815,7 +856,7 @@ model Mission {
 /// Per-user assignment of a mission. Re-assigned each rotation cycle for
 /// WEEKLY/MONTHLY missions; one-shot for ONBOARDING.
 model UserMission {
-  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                    String            @id @default(uuid(7)) @db.Uuid
   gamificationProfileId String            @db.Uuid
   missionId             String            @db.Uuid
   progress              Float             @default(0)
@@ -868,28 +909,28 @@ enum IntegrationStatus {
   ERROR
 }
 
-/// Integration instance for an organization. `credentials` holds an
+/// Integration instance for an profile. `credentials` holds an
 /// opaque encrypted blob (Supabase Vault / pgsodium or app-layer crypto);
 /// never read in plain text from this table. Adapters fetch the decrypted
 /// bundle via a trusted server-side helper (S-10.6).
 model Integration {
-  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String              @db.Uuid
-  type           IntegrationType
-  provider       IntegrationProvider
-  status         IntegrationStatus   @default(NOT_CONFIGURED)
+  id          String              @id @default(uuid(7)) @db.Uuid
+  profileId   String              @db.Uuid
+  type        IntegrationType
+  provider    IntegrationProvider
+  status      IntegrationStatus   @default(NOT_CONFIGURED)
   /// Encrypted credentials blob (JSONB ciphertext or base64). Decrypted
   /// only inside the integration worker via KMS/Vault. Never rendered.
-  credentials    Json?               @db.JsonB
-  lastSyncAt     DateTime?
-  lastError      String?
+  credentials Json?               @db.JsonB
+  lastSyncAt  DateTime?
+  lastError   String?
   /// Non-secret config: polling intervals, mapping tables, etc.
-  config         Json                @default("{}") @db.JsonB
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  config      Json                @default("{}") @db.JsonB
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
-  @@unique([organizationId, type, provider], name: "uniq_org_type_provider")
-  @@index([organizationId, status])
+  @@unique([profileId, type, provider], name: "uniq_profile_type_provider")
+  @@index([profileId, status])
   @@index([type, status])
   @@map("integrations")
 }
@@ -901,23 +942,23 @@ model Integration {
 /// service that writes an AuditLog documents the action vocabulary it
 /// uses. Reader UIs display actions verbatim.
 model AuditLog {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String   @db.Uuid
+  id         String   @id @default(uuid(7)) @db.Uuid
+  profileId  String   @db.Uuid
   /// Null for system-initiated actions (cron, engine) — caller context
   /// can still be inferred from `action` and `changes`.
-  userId         String?  @db.Uuid
-  action         String
-  entityType     String
-  entityId       String   @db.Uuid
+  userId     String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String   @db.Uuid
   /// Before/after diff as { before: {...}, after: {...} } or similar.
   /// Shape is action-dependent and must not contain unrendered secrets.
-  changes        Json     @db.JsonB
-  ipAddress      String?
-  userAgent      String?
-  createdAt      DateTime @default(now())
+  changes    Json     @db.JsonB
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
-  @@index([organizationId, createdAt(sort: Desc)])
-  @@index([organizationId, entityType, entityId])
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([profileId, entityType, entityId])
   @@index([userId])
   @@map("audit_logs")
 }
@@ -944,7 +985,7 @@ enum TransactionAuditActor {
 /// the transaction detail page's "Auditoría" tab (S-3.8) by avoiding a
 /// wide scan through AuditLog on every transaction render.
 model TransactionAudit {
-  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String                 @id @default(uuid(7)) @db.Uuid
   transactionId String                 @db.Uuid
   action        TransactionAuditAction
   performedBy   TransactionAuditActor
@@ -981,18 +1022,18 @@ enum NotificationStatus {
 /// channels exist in the enum so dispatching logic doesn't need a
 /// schema change when Resend/OneSignal land post-MVP.
 model Notification {
-  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String              @db.Uuid
-  organizationId String              @db.Uuid
-  type           NotificationType
-  title          String
-  body           String
-  actionUrl      String?
-  channel        NotificationChannel @default(IN_APP)
-  status         NotificationStatus  @default(UNREAD)
-  createdAt      DateTime            @default(now())
+  id        String              @id @default(uuid(7)) @db.Uuid
+  userId    String              @db.Uuid
+  profileId String              @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  actionUrl String?
+  channel   NotificationChannel @default(IN_APP)
+  status    NotificationStatus  @default(UNREAD)
+  createdAt DateTime            @default(now())
 
   @@index([userId, status, createdAt(sort: Desc)])
-  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([profileId, createdAt(sort: Desc)])
   @@map("notifications")
 }

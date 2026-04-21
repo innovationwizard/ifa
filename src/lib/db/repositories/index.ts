@@ -23,3 +23,6 @@ export type { AuditLogRepo } from './audit-log';
 
 export { accountRepo } from './account';
 export type { AccountRepo } from './account';
+
+export { profileRepo } from './profile';
+export type { ProfileRepo } from './profile';

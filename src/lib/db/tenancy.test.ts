@@ -16,15 +16,15 @@ describe('tenant context', () => {
     expect(getTenantContext()).toBeUndefined();
   });
 
-  it('propagates organizationId and userId inside a scope', async () => {
-    await withTenant({ organizationId: ORG_A, userId: USER_ID }, () => {
+  it('propagates profileId and userId inside a scope', async () => {
+    await withTenant({ profileId: ORG_A, userId: USER_ID }, () => {
       const ctx = getTenantContext();
-      expect(ctx).toEqual({ organizationId: ORG_A, userId: USER_ID });
+      expect(ctx).toEqual({ profileId: ORG_A, userId: USER_ID });
     });
   });
 
   it('allows userId to be null (cron/system path)', async () => {
-    await withTenant({ organizationId: ORG_A, userId: null }, () => {
+    await withTenant({ profileId: ORG_A, userId: null }, () => {
       expect(getTenantContext()?.userId).toBeNull();
     });
   });
@@ -32,22 +32,22 @@ describe('tenant context', () => {
   it('isolates contexts across concurrent scopes', async () => {
     const seen: string[] = [];
     await Promise.all([
-      withTenant({ organizationId: ORG_A, userId: USER_ID }, async () => {
+      withTenant({ profileId: ORG_A, userId: USER_ID }, async () => {
         await new Promise((r) => setTimeout(r, 10));
-        seen.push(getTenantContext()!.organizationId);
+        seen.push(getTenantContext()!.profileId);
       }),
-      withTenant({ organizationId: ORG_B, userId: USER_ID }, async () => {
+      withTenant({ profileId: ORG_B, userId: USER_ID }, async () => {
         await new Promise((r) => setTimeout(r, 5));
-        seen.push(getTenantContext()!.organizationId);
+        seen.push(getTenantContext()!.profileId);
       }),
     ]);
     expect(seen.sort()).toEqual([ORG_A, ORG_B].sort());
   });
 
   it('restores outer context after nested scope exits', async () => {
-    await withTenant({ organizationId: ORG_A, userId: USER_ID }, async () => {
-      await withTenant({ organizationId: ORG_B, userId: USER_ID }, () => Promise.resolve());
-      expect(getTenantContext()?.organizationId).toBe(ORG_A);
+    await withTenant({ profileId: ORG_A, userId: USER_ID }, async () => {
+      await withTenant({ profileId: ORG_B, userId: USER_ID }, () => Promise.resolve());
+      expect(getTenantContext()?.profileId).toBe(ORG_A);
     });
   });
 
@@ -66,21 +66,21 @@ describe('tenant context', () => {
   });
 
   it('requireTenant returns the context inside a scope', async () => {
-    await withTenant({ organizationId: ORG_A, userId: USER_ID }, () => {
+    await withTenant({ profileId: ORG_A, userId: USER_ID }, () => {
       const ctx = requireTenant('Transaction', 'findMany');
-      expect(ctx.organizationId).toBe(ORG_A);
+      expect(ctx.profileId).toBe(ORG_A);
     });
   });
 });
 
 describe('TENANT_SCOPED_MODELS allowlist', () => {
   it('covers every top-level tenant-owned table from the schema', () => {
-    // Top-level tables with an `organizationId` column that take tenant
+    // Top-level tables with an `profileId` column that take tenant
     // filtering directly. Sidecar tables (FelDteData, TpvTransactionData,
     // JournalEntryLine, XpEvent, UserBadge, UserMission, TransactionAudit)
     // intentionally omitted — they isolate through their parent.
     const expected = [
-      'OrganizationMember',
+      'ProfileMember',
       'Transaction',
       'Reconciliation',
       'Account',
@@ -99,8 +99,8 @@ describe('TENANT_SCOPED_MODELS allowlist', () => {
     }
   });
 
-  it('excludes global tables (User, Badge, Mission, Organization itself)', () => {
-    for (const model of ['User', 'Badge', 'Mission', 'Organization']) {
+  it('excludes global tables (User, Badge, Mission, Profile itself)', () => {
+    for (const model of ['User', 'Badge', 'Mission', 'Profile']) {
       expect(TENANT_SCOPED_MODELS.has(model)).toBe(false);
     }
   });

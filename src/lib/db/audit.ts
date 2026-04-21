@@ -130,7 +130,7 @@ export const auditExtension = Prisma.defineExtension({
 
             await prismaUnscoped.auditLog.create({
               data: {
-                organizationId: ctx.organizationId,
+                profileId: ctx.profileId,
                 userId: ctx.userId,
                 action: `${operation.toUpperCase()}_${model.toUpperCase()}`,
                 entityType: model,
@@ -147,7 +147,7 @@ export const auditExtension = Prisma.defineExtension({
               message: 'audit_write_failed',
               model,
               operation,
-              organizationId: ctx.organizationId,
+              profileId: ctx.profileId,
               error: err instanceof Error ? err.message : String(err),
             });
           }
