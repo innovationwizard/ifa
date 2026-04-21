@@ -301,8 +301,8 @@ export default function DesignSystemPage() {
             </h1>
             <p className="text-ifa-gray-700 mt-2">
               Source of truth:{' '}
-              <code className="font-mono text-sm">docs/genesis_docs/_IFA_SCAFFOLDING.md §5</code>.
-              This page is dev-only and returns 404 in production.
+              <code className="font-mono text-sm">docs_genesis/_IFA_SCAFFOLDING.md §5</code>. This
+              page is dev-only and returns 404 in production.
             </p>
             <p className="text-ifa-gray-500 mt-1 text-sm">
               {totalTokens} color tokens · {RADII.length} radii · {SHADOWS.length} shadows · 25

@@ -21,16 +21,16 @@ See the full MVP build plan in [`docs/_IFA_BUILD_PLAN.md`](docs/_IFA_BUILD_PLAN.
 
 ## Genesis documents
 
-The canonical sources of truth for this project are in [`docs/genesis_docs/`](docs/genesis_docs/):
+The canonical sources of truth for this project are in [`docs_genesis/`](docs_genesis/):
 
-| Document                                                                                                       | Purpose                                                        |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [`_THE_RULES.MD`](docs/genesis_docs/_THE_RULES.MD)                                                             | Non-negotiable operating constitution                          |
-| [`_IFA_SCAFFOLDING.md`](docs/genesis_docs/_IFA_SCAFFOLDING.md)                                                 | Production architecture, modules, data model                   |
-| [`_IFA_DEFINITIONS_AND_REASONING.md`](docs/genesis_docs/_IFA_DEFINITIONS_AND_REASONING.md)                     | Domain glossary, design rationale, why every decision was made |
-| [`0_Inteligencia-Financiera-App-Guatemala.pdf`](docs/genesis_docs/0_Inteligencia-Financiera-App-Guatemala.pdf) | Business case and market thesis                                |
-| [`1_benchmark_intuit.md`](docs/genesis_docs/1_benchmark_intuit.md)                                             | Credit Karma (Intuit) user-experience reference                |
-| [`2_benchmark_duolingo.md`](docs/genesis_docs/2_benchmark_duolingo.md)                                         | Duolingo gamification reference                                |
+| Document                                                                                                  | Purpose                                                        |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [`_THE_RULES.MD`](docs_genesis/_THE_RULES.MD)                                                             | Non-negotiable operating constitution                          |
+| [`_IFA_SCAFFOLDING.md`](docs_genesis/_IFA_SCAFFOLDING.md)                                                 | Production architecture, modules, data model                   |
+| [`_IFA_DEFINITIONS_AND_REASONING.md`](docs_genesis/_IFA_DEFINITIONS_AND_REASONING.md)                     | Domain glossary, design rationale, why every decision was made |
+| [`0_Inteligencia-Financiera-App-Guatemala.pdf`](docs_genesis/0_Inteligencia-Financiera-App-Guatemala.pdf) | Business case and market thesis                                |
+| [`1_benchmark_intuit.md`](docs_genesis/1_benchmark_intuit.md)                                             | Credit Karma (Intuit) user-experience reference                |
+| [`2_benchmark_duolingo.md`](docs_genesis/2_benchmark_duolingo.md)                                         | Duolingo gamification reference                                |
 
 The MVP plan derived from these sources lives at [`docs/_IFA_BUILD_PLAN.md`](docs/_IFA_BUILD_PLAN.md).
 
