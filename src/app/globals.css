@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 /*
  * IFA "Confianza" design tokens
@@ -51,12 +53,121 @@
   --shadow-ifa-modal:
     0 20px 25px rgba(15, 26, 46, 0.1), 0 8px 10px rgba(15, 26, 46, 0.04);
   --shadow-ifa-dropdown: 0 4px 6px rgba(15, 26, 46, 0.07);
+
+  /* Default transition (§5.3) */
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: ease-in-out;
 }
 
 /*
- * Global page baseline: Confianza palette on light surfaces.
- * Typography families are set in S-0.9 (next/font).
+ * shadcn/ui token bridge.
+ * shadcn components consume utilities like bg-background, text-foreground, etc.
+ * via the @theme inline block below. Here we anchor shadcn's raw CSS variables
+ * to IFA Confianza tokens so every shadcn primitive inherits the brand palette.
  */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /*
+   * shadcn expects one base --radius that it multiplies for xs/sm/md/lg/xl.
+   * Anchor to 8px (our --radius-ifa-card) so rounded-lg = card radius
+   * and rounded-md (0.8×) ≈ 6px = button/input radius.
+   */
+  --radius-xs: calc(var(--radius) * 0.5);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+/*
+ * Light-mode theme values — mapped to IFA Confianza tokens.
+ * Dark mode is deferred to post-MVP (scaffolding §5.4); when activated, a
+ * parallel .dark block here will invert these mappings.
+ */
+:root {
+  --background: var(--color-ifa-navy-50);
+  --foreground: var(--color-ifa-gray-900);
+
+  --card: var(--color-ifa-white);
+  --card-foreground: var(--color-ifa-gray-900);
+
+  --popover: var(--color-ifa-white);
+  --popover-foreground: var(--color-ifa-gray-900);
+
+  --primary: var(--color-ifa-navy-700);
+  --primary-foreground: var(--color-ifa-white);
+
+  --secondary: var(--color-ifa-teal-600);
+  --secondary-foreground: var(--color-ifa-white);
+
+  --muted: var(--color-ifa-gray-100);
+  --muted-foreground: var(--color-ifa-gray-500);
+
+  --accent: var(--color-ifa-navy-100);
+  --accent-foreground: var(--color-ifa-navy-900);
+
+  --destructive: var(--color-ifa-error);
+  --destructive-foreground: var(--color-ifa-white);
+
+  --border: var(--color-ifa-gray-300);
+  --input: var(--color-ifa-gray-300);
+  --ring: var(--color-ifa-teal-500);
+
+  /* Chart palette — uses IFA brand + semantic colors */
+  --chart-1: var(--color-ifa-teal-500);
+  --chart-2: var(--color-ifa-navy-600);
+  --chart-3: var(--color-ifa-gold-500);
+  --chart-4: var(--color-ifa-info);
+  --chart-5: var(--color-ifa-success);
+
+  /* Sidebar (IFA navy-800 surface with white text per §6.4) */
+  --sidebar: var(--color-ifa-navy-800);
+  --sidebar-foreground: var(--color-ifa-white);
+  --sidebar-primary: var(--color-ifa-teal-500);
+  --sidebar-primary-foreground: var(--color-ifa-white);
+  --sidebar-accent: var(--color-ifa-navy-700);
+  --sidebar-accent-foreground: var(--color-ifa-white);
+  --sidebar-border: var(--color-ifa-navy-700);
+  --sidebar-ring: var(--color-ifa-teal-500);
+
+  /* shadcn base radius — 8px so rounded-lg matches --radius-ifa-card */
+  --radius: 0.5rem;
+}
+
 @layer base {
   :root {
     color-scheme: light;
@@ -65,6 +176,15 @@
   html {
     background-color: var(--color-ifa-navy-50);
     color: var(--color-ifa-gray-900);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  * {
+    border-color: var(--color-border);
   }
 
   /*
@@ -85,13 +205,4 @@
 @utility ifa-focus-ring {
   outline: 2px solid var(--color-ifa-teal-500);
   outline-offset: 2px;
-}
-
-/*
- * Transition baseline (§5.3): 150ms ease-in-out.
- * Not a utility; applied explicitly via the token where needed.
- */
-@theme {
-  --default-transition-duration: 150ms;
-  --default-transition-timing-function: ease-in-out;
 }
