@@ -225,15 +225,15 @@ Supabase Auth's built-in SMTP covers signup confirmation + password reset. No in
 
 ### S-0.4: Tailwind CSS 4 with Confianza palette tokens
 
-**Description:** Configure Tailwind 4. Define every color token from `_IFA_SCAFFOLDING.md` §5.1 as CSS variables in `globals.css` and expose them as Tailwind theme extensions (`bg-ifa-navy-800`, `text-ifa-teal-600`, etc.). Define the radius, shadow, transition, and focus-ring tokens from §5.3.
+**Description:** Configure Tailwind 4 via the CSS-native `@theme` directive (Tailwind 4 no longer uses `tailwind.config.ts`). Define every color token from `_IFA_SCAFFOLDING.md` §5.1 as theme variables in `globals.css`. Expose them as Tailwind utilities (`bg-ifa-navy-800`, `text-ifa-teal-600`, etc.). Define the radius, shadow, transition, and focus-ring tokens from §5.3.
 **Acceptance criteria:**
 
-- [ ] All 26 color tokens accessible as Tailwind classes
-- [ ] Visual smoke test page at `/_design` (dev-only) renders every token swatch with hex label
-- [ ] Focus ring matches `2px solid var(--ifa-teal-500) offset 2px`
+- [x] All 23 color tokens from scaffolding §5.1 accessible as Tailwind classes (6 navy + 4 teal + 3 gold + 4 semantic + 5 gray + 1 white — earlier draft said 26, which was a miscount)
+- [x] Visual smoke test page at `/design-system` (dev-only via `NODE_ENV` + `notFound()` gate) renders every token swatch with hex label. Path differs from earlier draft `/_design` because Next.js App Router treats `_folders` as private (non-routable).
+- [x] Focus ring matches `2px solid var(--ifa-teal-500) offset 2px`, applied globally via `:focus-visible` and available as `.ifa-focus-ring` utility
       **Dependencies:** S-0.2
       **Complexity:** S
-      **Files:** `src/app/globals.css`, `tailwind.config.ts`, `src/app/_design/page.tsx`
+      **Files:** `src/app/globals.css`, `src/app/design-system/page.tsx`
 
 ### S-0.5: shadcn/ui installation and IFA-tuned base components
 

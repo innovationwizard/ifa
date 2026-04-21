@@ -1,1 +1,97 @@
 @import 'tailwindcss';
+
+/*
+ * IFA "Confianza" design tokens
+ * Source of truth: docs/genesis_docs/_IFA_SCAFFOLDING.md §5.1 (colors) and §5.3 (components).
+ * Changes to these tokens must be synchronized with the scaffolding document.
+ */
+@theme {
+  /* Primary — Navy (trust, authority) */
+  --color-ifa-navy-900: #0f1a2e;
+  --color-ifa-navy-800: #1b2d4a;
+  --color-ifa-navy-700: #264573;
+  --color-ifa-navy-600: #2e5a8f;
+  --color-ifa-navy-100: #e8eef6;
+  --color-ifa-navy-50: #f4f7fb;
+
+  /* Secondary — Teal (innovation, action) */
+  --color-ifa-teal-600: #0d847a;
+  --color-ifa-teal-500: #0fa698;
+  --color-ifa-teal-400: #2ec4b6;
+  --color-ifa-teal-100: #d1f5f0;
+
+  /* Accent — Gold (prosperity, achievement) */
+  --color-ifa-gold-500: #d4a843;
+  --color-ifa-gold-400: #e5c06e;
+  --color-ifa-gold-100: #fdf5e3;
+
+  /* Semantic */
+  --color-ifa-success: #16a34a;
+  --color-ifa-warning: #e5930b;
+  --color-ifa-error: #dc2626;
+  --color-ifa-info: #2563eb;
+
+  /* Neutral */
+  --color-ifa-gray-900: #111827;
+  --color-ifa-gray-700: #374151;
+  --color-ifa-gray-500: #6b7280;
+  --color-ifa-gray-300: #d1d5db;
+  --color-ifa-gray-100: #f3f4f6;
+  --color-ifa-white: #ffffff;
+
+  /* Component radii (§5.3) */
+  --radius-ifa-card: 8px;
+  --radius-ifa-button: 6px;
+  --radius-ifa-input: 6px;
+  --radius-ifa-pill: 9999px;
+
+  /* Elevation (§5.3) */
+  --shadow-ifa-card:
+    0 1px 3px rgba(15, 26, 46, 0.08), 0 1px 2px rgba(15, 26, 46, 0.04);
+  --shadow-ifa-modal:
+    0 20px 25px rgba(15, 26, 46, 0.1), 0 8px 10px rgba(15, 26, 46, 0.04);
+  --shadow-ifa-dropdown: 0 4px 6px rgba(15, 26, 46, 0.07);
+}
+
+/*
+ * Global page baseline: Confianza palette on light surfaces.
+ * Typography families are set in S-0.9 (next/font).
+ */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    background-color: var(--color-ifa-navy-50);
+    color: var(--color-ifa-gray-900);
+  }
+
+  /*
+   * Focus ring (§5.3): 2px solid var(--ifa-teal-500) offset 2px.
+   * Scoped to keyboard focus (:focus-visible) so pointer interactions do not
+   * flash the ring unnecessarily.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-ifa-teal-500);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Utility for explicitly applying the IFA focus ring to custom elements
+ * whose intrinsic focus styling should be overridden.
+ */
+@utility ifa-focus-ring {
+  outline: 2px solid var(--color-ifa-teal-500);
+  outline-offset: 2px;
+}
+
+/*
+ * Transition baseline (§5.3): 150ms ease-in-out.
+ * Not a utility; applied explicitly via the token where needed.
+ */
+@theme {
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: ease-in-out;
+}
