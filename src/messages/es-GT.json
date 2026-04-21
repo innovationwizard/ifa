@@ -71,12 +71,32 @@
       "saved": "Guardado"
     },
     "validation": {
-      "required": "Este campo es obligatorio.",
-      "invalidFormat": "Formato inválido.",
-      "invalidEmail": "Correo electrónico inválido.",
-      "invalidNit": "NIT inválido.",
-      "minLength": "Debe tener al menos {n} caracteres.",
-      "maxLength": "Máximo {n} caracteres."
+      "required": "Este dato es necesario.",
+      "invalidFormat": "Este formato no sirve.",
+      "invalidEmail": "Este correo no parece válido.",
+      "invalidNit": "Este NIT no parece válido.",
+      "minLength": "Necesita por lo menos {n} caracteres.",
+      "maxLength": "Solo caben {n} caracteres."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Entra a IFA",
+      "subtitle": "Usa tu correo y tu clave.",
+      "emailLabel": "Tu correo",
+      "emailPlaceholder": "tu@correo.com",
+      "passwordLabel": "Tu clave",
+      "passwordPlaceholder": "Tu clave secreta",
+      "submit": "Entrar",
+      "submitting": "Entrando...",
+      "noAccountYet": "¿Aún no tienes cuenta?",
+      "createAccount": "Crea tu cuenta",
+      "forgotPassword": "¿Olvidaste tu clave?",
+      "errors": {
+        "invalidCredentials": "El correo o la clave no coinciden. Revisa e intenta de nuevo.",
+        "rateLimited": "Muchos intentos seguidos. Espera un minuto y prueba otra vez.",
+        "unknown": "No pudimos entrar. Intenta de nuevo en un rato."
+      }
     }
   },
   "errors": {

@@ -42,5 +42,18 @@ export default defineConfig({
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
+    /*
+     * Playwright sets NODE_ENV=test on the parent process, which Next.js
+     * subprocesses inherit. Next.js refuses to load `.env.local` when
+     * NODE_ENV is not 'development' or 'production', so every
+     * NEXT_PUBLIC_* env var comes through as undefined and any client
+     * module that reads them at init-time throws on module load.
+     * Explicitly forcing NODE_ENV back to 'development' for the test
+     * webserver restores normal env-loading behavior without creating a
+     * parallel `.env.test.local` file.
+     */
+    env: {
+      NODE_ENV: 'development',
+    },
   },
 });

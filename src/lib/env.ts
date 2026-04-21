@@ -1,59 +1,73 @@
 /**
  * Typed environment-variable access.
  *
- * Why this module exists: `process.env.*` is `string | undefined`, so naive
- * usage either litters the codebase with `!` non-null assertions (forbidden
- * by our strict-TS rules) or risks runtime `undefined` reaching real code.
- * Every env var the app depends on passes through `requireEnv()` exactly
- * once here, with a clear error if it's missing.
+ * Every env var the app depends on passes through this module. Two critical
+ * constraints drive the shape below:
  *
- * Public-safe vars (prefixed `NEXT_PUBLIC_`) are read on the client; the
- * server-only vars (SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, database
- * URLs) are gated behind a runtime guard so a mis-import on the client
- * throws loudly rather than leaking secrets silently.
+ *   1. Next.js inlines `NEXT_PUBLIC_*` values into the client bundle via
+ *      compile-time string replacement, but ONLY for static property access
+ *      (`process.env.NEXT_PUBLIC_FOO`). Dynamic access
+ *      (`process.env[name]`, where `name` is a runtime value) does NOT get
+ *      inlined — at runtime the browser sees an effectively empty
+ *      `process.env` and reads come back `undefined`. So every public var
+ *      below must be referenced by its literal name.
+ *
+ *   2. Server-only secrets (service role key, DB URLs, Anthropic key) must
+ *      never be accessed from a module that can be imported into the client
+ *      bundle. `getServerEnv()` reads them lazily inside a function that's
+ *      gated on `typeof window`, so the values stay out of any code path
+ *      imported by `'use client'` modules.
  */
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
+// ---------------------------------------------------------------------------
+// Public env vars — client-safe. Static access so Next can inline the values.
+// ---------------------------------------------------------------------------
+
+const rawSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const rawSupabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+const rawDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE;
+const rawVercelUrl = process.env.VERCEL_URL;
+
+if (!rawSupabaseUrl || !rawSupabaseAnonKey) {
+  throw new Error(
+    'Missing required public env vars: NEXT_PUBLIC_SUPABASE_URL and ' +
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set. Copy from .env.example ' +
+      'into .env.local (see docs_operations/vercel-setup.md).',
+  );
+}
+
+export const publicEnv = {
+  supabaseUrl: rawSupabaseUrl,
+  supabaseAnonKey: rawSupabaseAnonKey,
+  demoMode: rawDemoMode === 'true',
+  /**
+   * Canonical URL of the app. Falls back to `https://$VERCEL_URL` on Vercel,
+   * then to localhost for dev.
+   */
+  siteUrl: rawSiteUrl ?? (rawVercelUrl ? `https://${rawVercelUrl}` : 'http://localhost:3000'),
+} as const;
+
+// ---------------------------------------------------------------------------
+// Server-only env vars — static access too, but wrapped in a function that
+// asserts we're on the server. Never touch this from a `'use client'` module.
+// ---------------------------------------------------------------------------
+
+function requireServerEnv(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(
-      `Missing required environment variable: ${name}. ` +
-        `Copy from .env.example into .env.local (see docs_operations/vercel-setup.md).`,
+      `Missing required server env var: ${name}. Set it in .env.local for ` +
+        `local dev or in your Vercel project's Environment Variables for ` +
+        `preview/production.`,
     );
   }
   return value;
 }
 
-function assertServer(): void {
-  if (typeof window !== 'undefined') {
-    throw new Error(
-      'Server-only env var imported into client code. Split the import into a server module.',
-    );
-  }
-}
-
 /**
- * Public env vars — safe on both client and server.
- * Keep this surface intentionally small; every addition here is shipped
- * to every browser bundle.
- */
-export const publicEnv = {
-  supabaseUrl: requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
-  supabaseAnonKey: requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
-  demoMode: process.env.NEXT_PUBLIC_DEMO_MODE === 'true',
-  /**
-   * Canonical URL of the app. Falls back to `https://$VERCEL_URL` on Vercel,
-   * then to localhost for dev.
-   */
-  siteUrl:
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'),
-} as const;
-
-/**
- * Server-only env vars — THROWS if imported into a client bundle. Touch
- * these only from route handlers, server actions, middleware, and server
- * components.
+ * Server-only env vars. THROWS if called from a client bundle (where
+ * `window` is defined). Touch these only from route handlers, server
+ * actions, middleware/proxy, and server components.
  */
 export function getServerEnv(): {
   supabaseServiceRoleKey: string;
@@ -61,11 +75,19 @@ export function getServerEnv(): {
   directUrl: string;
   anthropicApiKey: string;
 } {
-  assertServer();
+  if (typeof window !== 'undefined') {
+    throw new Error(
+      'getServerEnv() called from a client bundle. Split the import so only ' +
+        'server code touches server-only secrets.',
+    );
+  }
   return {
-    supabaseServiceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-    databaseUrl: requireEnv('DATABASE_URL'),
-    directUrl: requireEnv('DIRECT_URL'),
-    anthropicApiKey: requireEnv('ANTHROPIC_API_KEY'),
+    supabaseServiceRoleKey: requireServerEnv(
+      'SUPABASE_SERVICE_ROLE_KEY',
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+    ),
+    databaseUrl: requireServerEnv('DATABASE_URL', process.env.DATABASE_URL),
+    directUrl: requireServerEnv('DIRECT_URL', process.env.DIRECT_URL),
+    anthropicApiKey: requireServerEnv('ANTHROPIC_API_KEY', process.env.ANTHROPIC_API_KEY),
   };
 }
