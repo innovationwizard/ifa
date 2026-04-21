@@ -17,6 +17,10 @@ export interface TenantContext {
   organizationId: string;
   /** User performing the action; null for cron/system paths. */
   userId: string | null;
+  /** Request IP for audit logging. Optional — absent on cron paths. */
+  ipAddress?: string;
+  /** Request user-agent for audit logging. Optional — absent on cron paths. */
+  userAgent?: string;
 }
 
 const storage = new AsyncLocalStorage<TenantContext>();

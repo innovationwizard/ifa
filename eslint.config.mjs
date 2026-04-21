@@ -100,6 +100,42 @@ export default tseslint.config(
     },
   },
 
+  /*
+   * Repository boundary enforcement (S-1.10).
+   *
+   * Application code must go through `@/lib/db/repositories` so access
+   * contracts (e.g., AuditLog immutability) are enforced at the type level
+   * rather than being convention only. Direct imports of `@/lib/db/prisma`
+   * are banned outside:
+   *   - src/lib/db/**     : the client itself, extensions, repositories
+   *   - prisma/**         : seeds and migration scripts
+   */
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/lib/db/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/lib/db/prisma',
+              message:
+                'Import from @/lib/db/repositories instead. Direct prisma access is restricted to src/lib/db/** to preserve AuditLog immutability and tenancy guarantees.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/lib/db/prisma', '**/lib/db/prisma.ts'],
+              message:
+                'Import from @/lib/db/repositories instead. Direct prisma access is restricted to src/lib/db/** to preserve AuditLog immutability and tenancy guarantees.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   {
     files: ['**/*.{js,mjs,cjs}', 'eslint.config.mjs', 'next.config.ts', 'postcss.config.mjs'],
     ...tseslint.configs.disableTypeChecked,
