@@ -76,6 +76,8 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Toaster } from '@/components/ui/sonner';
+import { Logo } from '@/components/branding/logo';
+import { Money } from '@/components/primitives/money';
 import {
   Form,
   FormControl,
@@ -364,6 +366,115 @@ export default function DesignSystemPage() {
             >
               Hazme foco con Tab
             </button>
+          </section>
+
+          <section className="mb-12">
+            <h2 className="text-ifa-navy-900 mb-4 text-xl font-semibold">Typography</h2>
+            <p className="text-ifa-gray-700 mb-4 text-sm">
+              Inter (variable) for UI; JetBrains Mono for monetary amounts.
+            </p>
+            <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card space-y-3 p-5">
+              <div className="font-sans text-4xl font-bold tracking-tight">
+                Inteligencia Financiera
+              </div>
+              <div className="font-sans text-2xl font-semibold">Sección secundaria</div>
+              <div className="font-sans text-base">
+                Párrafo base en Inter 16px — legibilidad de ñ, á, é, í, ó, ú, ü garantizada.
+              </div>
+              <div className="text-ifa-gray-500 font-sans text-sm">
+                Texto secundario 14px con ligadura de dígitos tabulares.
+              </div>
+              <div className="font-mono text-sm tabular-nums">
+                0123456789 · O vs 0 · l vs 1 · JetBrains Mono
+              </div>
+            </div>
+          </section>
+
+          <section className="mb-12">
+            <h2 className="text-ifa-navy-900 mb-4 text-xl font-semibold">
+              {'<Money />'} — formato monetario
+            </h2>
+            <p className="text-ifa-gray-700 mb-4 text-sm">
+              Decimales alineados vía <code className="font-mono">tabular-nums</code>; valores
+              negativos entre paréntesis (convención contable latinoamericana, scaffolding §12.3).
+            </p>
+            <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card p-5">
+              <table className="w-full max-w-xl">
+                <tbody className="divide-ifa-gray-100 divide-y">
+                  <tr>
+                    <td className="text-ifa-gray-700 py-2 text-sm">Positivo (GTQ)</td>
+                    <td className="py-2 text-right">
+                      <Money amount={1234.56} />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="text-ifa-gray-700 py-2 text-sm">Con signo explícito</td>
+                    <td className="py-2 text-right">
+                      <Money amount={1234.56} showSign />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="text-ifa-gray-700 py-2 text-sm">Negativo (paréntesis)</td>
+                    <td className="text-ifa-error py-2 text-right">
+                      <Money amount={-1234.56} />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="text-ifa-gray-700 py-2 text-sm">Cero</td>
+                    <td className="py-2 text-right">
+                      <Money amount={0} />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="text-ifa-gray-700 py-2 text-sm">Dólares (USD)</td>
+                    <td className="py-2 text-right">
+                      <Money amount={9876.5} currency="USD" />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="text-ifa-gray-700 py-2 text-sm">Monto grande</td>
+                    <td className="py-2 text-right">
+                      <Money amount={1234567.89} />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mb-12">
+            <h2 className="text-ifa-navy-900 mb-4 text-xl font-semibold">Brand logo</h2>
+            <p className="text-ifa-gray-700 mb-4 text-sm">
+              <code className="font-mono">{'<Logo />'}</code> uses{' '}
+              <code className="font-mono">HandCoins</code> from{' '}
+              <code className="font-mono">lucide-react</code>. Color inherits via{' '}
+              <code className="font-mono">currentColor</code>.
+            </p>
+            <div className="space-y-3">
+              <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card text-ifa-navy-800 flex flex-wrap items-center gap-6 p-5">
+                <Logo variant="full" />
+                <Logo variant="compact" />
+                <Logo variant="icon" />
+                <span className="text-ifa-gray-500 text-xs">
+                  Sobre superficie clara (<code className="font-mono">text-ifa-navy-800</code>)
+                </span>
+              </div>
+              <div className="bg-ifa-navy-800 rounded-ifa-card text-ifa-white flex flex-wrap items-center gap-6 p-5">
+                <Logo variant="full" />
+                <Logo variant="compact" />
+                <Logo variant="icon" />
+                <span className="text-ifa-navy-100 text-xs">
+                  Sobre superficie oscura (<code className="font-mono">text-ifa-white</code>)
+                </span>
+              </div>
+              <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card text-ifa-teal-600 flex flex-wrap items-center gap-6 p-5">
+                <Logo variant="compact" iconSize={32} className="text-2xl" />
+                <span className="text-ifa-gray-500 text-xs">
+                  Tamaño personalizado + color override (teal via{' '}
+                  <code className="font-mono">text-ifa-teal-600</code>)
+                </span>
+              </div>
+            </div>
           </section>
 
           <section className="space-y-6">

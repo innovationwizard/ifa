@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# Exit on first non-zero exit so a failed lint-staged does not let the
+# commit slide through to typecheck, and a green typecheck cannot mask
+# a failed lint-staged step.
+set -e
+
+# Format + lint the staged files (fast, scoped to what changed).
+pnpm exec lint-staged
+
+# Type-check the whole project (fast incremental after the first run).
+# Why here and not in lint-staged: TypeScript must see the full dependency
+# graph to produce correct errors, not just the staged files.
+pnpm typecheck

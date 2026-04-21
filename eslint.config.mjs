@@ -16,6 +16,7 @@ export default tseslint.config(
       'node_modules/**',
       'coverage/**',
       'playwright-report/**',
+      'playwright/.cache/**',
       'test-results/**',
       'next-env.d.ts',
       'out/**',
@@ -122,6 +123,49 @@ export default tseslint.config(
     rules: {
       'jsx-a11y/click-events-have-key-events': 'off',
       'jsx-a11y/no-noninteractive-element-interactions': 'off',
+    },
+  },
+
+  /*
+   * Warn when user-facing strings live in JSX. Every user-facing string
+   * should be sourced from src/messages/es-GT.json (S-0.8 acceptance
+   * criterion). Kept as a warning rather than an error so it surfaces
+   * without blocking dev loops; promote to error once Phase 2 stabilizes.
+   *
+   * Exemptions:
+   *  - src/components/ui/**     : vendored shadcn primitives
+   *  - src/app/design-system/** : dev-only visual smoke test page
+   *  - src/components/branding/**, src/lib/branding/** : brand lockup
+   *    text ("IFA", wordmark) is branding data, not localized copy
+   *  - src/app/icon.tsx, apple-icon.tsx, opengraph-image.tsx : branded
+   *    static image generators; the wordmark/tagline live in code per
+   *    next/og conventions
+   */
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      'src/components/ui/**',
+      'src/app/design-system/**',
+      'src/components/branding/**',
+      'src/lib/branding/**',
+      'src/app/icon.tsx',
+      'src/app/apple-icon.tsx',
+      'src/app/opengraph-image.tsx',
+    ],
+    rules: {
+      'react/jsx-no-literals': [
+        'warn',
+        {
+          noStrings: true,
+          ignoreProps: true,
+          /*
+           * Punctuation and separators that are universal and never translated
+           * are allowed to live inline in JSX. Any prose or label must come
+           * from src/messages/es-GT.json.
+           */
+          allowedStrings: ['·', '—', '→', '{', '}', ' ', '\u00A0', ':', '.', ','],
+        },
+      ],
     },
   },
 );

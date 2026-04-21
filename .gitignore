@@ -14,6 +14,7 @@ out/
 # Test artifacts
 coverage/
 playwright-report/
+playwright/.cache/
 test-results/
 .nyc_output/
 
