@@ -1,53 +1,72 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('/ingresar — login page', () => {
-  test('renders the form with title and inputs', async ({ page }) => {
+test.describe('/ingresar — magic-link + Google OAuth sign-in', () => {
+  test('renders the page chrome: heading, Google button, email form, terms link', async ({
+    page,
+  }) => {
     await page.goto('/ingresar');
     await expect(page.getByRole('heading', { level: 1, name: /Entra a IFA/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Continúa con Google/i })).toBeVisible();
     await expect(page.getByLabel(/Tu correo/i)).toBeVisible();
-    await expect(page.getByLabel(/Tu clave/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Entrar$/ })).toBeVisible();
-  });
-
-  test('navigation links point at the expected auth routes', async ({ page }) => {
-    await page.goto('/ingresar');
-    await expect(page.getByRole('link', { name: /Crea tu cuenta/i })).toHaveAttribute(
+    await expect(page.getByRole('button', { name: /Mándame el enlace/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Términos$/ })).toHaveAttribute(
       'href',
-      '/crear-cuenta',
+      '/terminos',
     );
-    await expect(page.getByRole('link', { name: /Olvidaste tu clave/i })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: /^Privacidad$/ })).toHaveAttribute(
       'href',
-      '/recuperar',
+      '/privacidad',
     );
   });
 
-  test('invalid credentials surface the generic non-enumerating error', async ({ page }) => {
+  test('submitting a valid email navigates to /ingresar/revisa-tu-correo with the email in the query', async ({
+    page,
+  }) => {
+    /*
+     * Intercept Supabase's OTP endpoint so the test doesn't depend on
+     * real network or email deliverability. Supabase's JS client posts to
+     * `{projectUrl}/auth/v1/otp`; we match any supabase.co host's `/otp`
+     * path and return a minimal success body.
+     */
+    await page.route('**/auth/v1/otp**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({}),
+      });
+    });
+
     await page.goto('/ingresar');
-    // pressSequentially (not fill) — fill() on a controlled react-hook-form
-    // input under WebKit sometimes fails to dispatch the change event RHF
-    // listens for, leaving the form thinking the field is empty. Typing
-    // character-by-character dispatches real input events and works on
-    // every engine.
-    await page.getByLabel(/Tu correo/i).pressSequentially('no-such-user@example.test');
-    await page.getByLabel(/Tu clave/i).pressSequentially('definitely-wrong-password');
-    await page.getByRole('button', { name: /^Entrar$/ }).click();
-    // Scope the alert by text — Next.js's internal
-    // `#__next-route-announcer__` also carries role="alert" but is empty.
-    const alert = page.getByRole('alert').filter({ hasText: /El correo o la clave/ });
-    await expect(alert).toBeVisible({ timeout: 10_000 });
-    // Still on /ingresar — no redirect happened.
-    expect(new URL(page.url()).pathname).toBe('/ingresar');
+    await page
+      .getByLabel(/Tu correo/i)
+      .pressSequentially('first-time-user-at-example.test'.replace('-at-', '@'));
+    await page.getByRole('button', { name: /Mándame el enlace/i }).click();
+    // Wait for navigation to the check-inbox page.
+    await page.waitForURL(/\/ingresar\/revisa-tu-correo/, { timeout: 10_000 });
+    const finalUrl = new URL(page.url());
+    expect(finalUrl.pathname).toBe('/ingresar/revisa-tu-correo');
+    expect(finalUrl.searchParams.get('email')).toBe('first-time-user@example.test');
   });
 
-  test('form is keyboard-navigable (Tab order + Enter to submit)', async ({ page }) => {
+  test('revisa-tu-correo renders the submitted email and a back-to-ingresar link', async ({
+    page,
+  }) => {
+    await page.goto('/ingresar/revisa-tu-correo?email=check%40example.test');
+    await expect(page.getByRole('heading', { level: 1, name: /Revisa tu correo/i })).toBeVisible();
+    await expect(page.getByText('check@example.test')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Reenviar/i })).toHaveAttribute(
+      'href',
+      '/ingresar',
+    );
+  });
+
+  test('zod validation rejects a badly-formatted email before it hits Supabase', async ({
+    page,
+  }) => {
     await page.goto('/ingresar');
-    await page.getByLabel(/Tu correo/i).focus();
-    await page.keyboard.type('keyboard@example.test');
-    await page.keyboard.press('Tab');
-    await page.keyboard.type('some-wrong-password');
-    // Enter while focused on password submits the form.
-    await page.keyboard.press('Enter');
-    const alert = page.getByRole('alert').filter({ hasText: /El correo o la clave/ });
-    await expect(alert).toBeVisible({ timeout: 10_000 });
+    await page.getByLabel(/Tu correo/i).pressSequentially('not-an-email');
+    await page.getByRole('button', { name: /Mándame el enlace/i }).click();
+    // No navigation — we're still on /ingresar.
+    await expect(page).toHaveURL(/\/ingresar$/);
   });
 });

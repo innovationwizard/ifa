@@ -19,7 +19,7 @@ describe('isProtectedPath', () => {
     expect(isProtectedPath(path)).toBe(true);
   });
 
-  it.each(['/', '/ingresar', '/crear-cuenta', '/recuperar', '/design-system', '/terminos'])(
+  it.each(['/', '/ingresar', '/ingresar/revisa-tu-correo', '/design-system', '/terminos'])(
     'does NOT treat %s as protected',
     (path) => {
       expect(isProtectedPath(path)).toBe(false);
@@ -32,11 +32,11 @@ describe('isProtectedPath', () => {
 });
 
 describe('isAuthPage', () => {
-  it.each(['/ingresar', '/crear-cuenta', '/recuperar'])('treats %s as auth page', (path) => {
+  it.each(['/ingresar', '/ingresar/revisa-tu-correo'])('treats %s as auth page', (path) => {
     expect(isAuthPage(path)).toBe(true);
   });
 
-  it.each(['/', '/dashboard', '/auth/callback', '/design-system'])(
+  it.each(['/', '/dashboard', '/auth/callback', '/design-system', '/terminos', '/precios'])(
     'does NOT treat %s as auth page',
     (path) => {
       expect(isAuthPage(path)).toBe(false);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeNext } from './safe-next';
+import { isSafeNext, safeNext } from './safe-next';
 
 describe('safeNext', () => {
   it('returns /dashboard as the safe default', () => {
@@ -39,4 +39,27 @@ describe('safeNext', () => {
     expect(safeNext('/transacciones?filter=unmatched')).toBe('/transacciones?filter=unmatched');
     expect(safeNext('/dashboard#salud')).toBe('/dashboard#salud');
   });
+
+  it('honors a custom fallback when next is unsafe', () => {
+    expect(safeNext(null, '/bienvenida')).toBe('/bienvenida');
+    expect(safeNext('https://evil.example', '/bienvenida')).toBe('/bienvenida');
+    // Safe next still wins over the fallback.
+    expect(safeNext('/dashboard', '/bienvenida')).toBe('/dashboard');
+  });
+});
+
+describe('isSafeNext', () => {
+  it.each([null, undefined, '', 'dashboard', '//evil.com', 'https://evil.com', '/\\evil'])(
+    'returns false for %p',
+    (v) => {
+      expect(isSafeNext(v)).toBe(false);
+    },
+  );
+
+  it.each(['/', '/dashboard', '/transacciones/abc?filter=unmatched', '/reportes#salud'])(
+    'returns true for %p',
+    (v) => {
+      expect(isSafeNext(v)).toBe(true);
+    },
+  );
 });

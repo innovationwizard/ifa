@@ -29,12 +29,18 @@ export const PROTECTED_PREFIXES = [
 
 /**
  * Auth pages — shown to anonymous users only. Authenticated users hitting
- * any of these are redirected to `/dashboard` (the user's home). The Supabase
- * callback route under `/auth/callback` is NOT in this list because it needs
- * to run for signed-in users too (it completes email confirmation + sets
- * the session cookie before redirecting onward).
+ * any of these are redirected to `/dashboard` (the user's home). The
+ * Supabase callback route under `/auth/callback` is NOT in this list
+ * because it needs to run for signed-in users too (it completes magic-link
+ * / OAuth code exchange + sets the session cookie before redirecting
+ * onward).
+ *
+ * Single route because IFA uses passwordless auth: OAuth (Google) plus
+ * magic-link email. There is no password-reset flow to house at /recuperar
+ * and no separate sign-up flow — first-time magic-link submission creates
+ * the account.
  */
-export const AUTH_PAGES = ['/ingresar', '/crear-cuenta', '/recuperar'] as const;
+export const AUTH_PAGES = ['/ingresar'] as const;
 
 /**
  * Post-authentication landing route. Onboarding state may redirect further

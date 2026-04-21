@@ -1,28 +1,36 @@
 import { AUTHENTICATED_HOME } from './routes';
 
 /**
- * Sanitize the `?next=` redirect param.
+ * Type-guard predicate: is `value` a safe relative destination?
  *
- * The login flow preserves where the user was headed before being
- * bounced to `/ingresar`. An attacker-controlled `next` is a classic
- * open-redirect vector: `/ingresar?next=https://evil.example/phish`
- * would send the user off the site post-login if we didn't guard it.
- *
- * Rules:
+ * An attacker-controlled `next` is a classic open-redirect vector
+ * (`/ingresar?next=https://evil.example/phish`). These rules together
+ * block every bypass vector I know of:
  *   - Must be a string
  *   - Must start with a single `/`
  *   - Must NOT start with `//` (protocol-relative URL like `//evil.com`)
  *   - Must NOT contain `://` (absolute URL)
  *   - Must NOT contain `\\` (Windows-style backslash that some parsers
  *     interpret as a scheme separator)
- *
- * Anything else resolves to the authenticated home (/dashboard).
  */
-export function safeNext(next: string | null | undefined): string {
-  if (typeof next !== 'string' || next.length === 0) return AUTHENTICATED_HOME;
-  if (!next.startsWith('/')) return AUTHENTICATED_HOME;
-  if (next.startsWith('//')) return AUTHENTICATED_HOME;
-  if (next.includes('://')) return AUTHENTICATED_HOME;
-  if (next.includes('\\')) return AUTHENTICATED_HOME;
-  return next;
+export function isSafeNext(next: string | null | undefined): next is string {
+  if (typeof next !== 'string' || next.length === 0) return false;
+  if (!next.startsWith('/')) return false;
+  if (next.startsWith('//')) return false;
+  if (next.includes('://')) return false;
+  if (next.includes('\\')) return false;
+  return true;
+}
+
+/**
+ * Resolve `?next=` to a safe destination with a configurable fallback.
+ * Default fallback is `AUTHENTICATED_HOME` (/dashboard) — the login flow
+ * default. The email-confirmation callback passes `/bienvenida` instead,
+ * which is why the fallback is parameterized.
+ */
+export function safeNext(
+  next: string | null | undefined,
+  fallback: string = AUTHENTICATED_HOME,
+): string {
+  return isSafeNext(next) ? next : fallback;
 }

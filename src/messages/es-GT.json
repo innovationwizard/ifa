@@ -80,23 +80,52 @@
     }
   },
   "auth": {
-    "login": {
+    "signIn": {
       "title": "Entra a IFA",
-      "subtitle": "Usa tu correo y tu clave.",
+      "subtitle": "Un click con Google, o te mandamos un enlace a tu correo.",
+      "oauthGoogle": "Continúa con Google",
+      "or": "o",
       "emailLabel": "Tu correo",
       "emailPlaceholder": "tu@correo.com",
-      "passwordLabel": "Tu clave",
-      "passwordPlaceholder": "Tu clave secreta",
-      "submit": "Entrar",
-      "submitting": "Entrando...",
-      "noAccountYet": "¿Aún no tienes cuenta?",
-      "createAccount": "Crea tu cuenta",
-      "forgotPassword": "¿Olvidaste tu clave?",
+      "submit": "Mándame el enlace",
+      "submitting": "Enviando...",
+      "cooldown": "Espera {seconds} segundos antes de pedir otro.",
+      "termsPrefix": "Al entrar aceptas los",
+      "termsLink": "Términos",
+      "termsJoiner": "y la",
+      "privacyLink": "Privacidad",
       "errors": {
-        "invalidCredentials": "El correo o la clave no coinciden. Revisa e intenta de nuevo.",
-        "rateLimited": "Muchos intentos seguidos. Espera un minuto y prueba otra vez.",
-        "unknown": "No pudimos entrar. Intenta de nuevo en un rato."
+        "invalidEmail": "Este correo no parece válido.",
+        "rateLimited": "Muchos intentos. Espera un minuto y prueba otra vez.",
+        "oauthUnavailable": "No pudimos conectar con Google. Intenta otra vez.",
+        "unknown": "Algo falló. Intenta otra vez en un rato."
       }
+    },
+    "checkInbox": {
+      "title": "Revisa tu correo",
+      "bodyLead": "Te mandamos un enlace a",
+      "bodyTail": ". Ábrelo para entrar a IFA.",
+      "didntGet": "¿No te llegó el correo?",
+      "resend": "Reenviar",
+      "resent": "Listo, te mandamos otro. Revisa tu bandeja.",
+      "wrongEmail": "¿Usaste el correo incorrecto?",
+      "useAnotherEmail": "Intenta con otro"
+    },
+    "callback": {
+      "errors": {
+        "missingCode": "El enlace ya no es válido. Pide uno nuevo.",
+        "exchangeFailed": "El enlace no funcionó. Pide uno nuevo."
+      }
+    }
+  },
+  "legal": {
+    "terms": {
+      "title": "Términos de uso",
+      "placeholder": "Esta sección está en revisión legal. Cuando esté lista, aquí verás los términos completos."
+    },
+    "privacy": {
+      "title": "Aviso de privacidad",
+      "placeholder": "Esta sección está en revisión legal. Cuando esté lista, aquí verás cómo cuidamos tu información."
     }
   },
   "errors": {
