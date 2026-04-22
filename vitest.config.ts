@@ -12,6 +12,16 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     tsconfigPaths: true,
+    alias: {
+      /*
+       * Next.js's `server-only` package throws on import from client
+       * code as a compile-time guard. Vitest runs in Node and has no
+       * notion of server/client bundles, so the import would fail. Alias
+       * it to a no-op module so tests that touch server files can run
+       * without stripping the guard from production code.
+       */
+      'server-only': new URL('./vitest.server-only-shim.ts', import.meta.url).pathname,
+    },
   },
   test: {
     environment: 'jsdom',

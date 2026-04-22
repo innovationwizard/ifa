@@ -118,6 +118,13 @@
       }
     }
   },
+  "onboarding": {
+    "welcome": {
+      "title": "¡Hola, {name}!",
+      "body": "Gracias por entrar a IFA. Vamos a configurar tu espacio en unos pasos cortos.",
+      "cta": "Empezar"
+    }
+  },
   "legal": {
     "terms": {
       "title": "Términos de uso",
