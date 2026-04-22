@@ -1,8 +1,7 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Logo } from '@/components/branding/logo';
-import { Button } from '@/components/ui/button';
+import { WelcomeForm } from '@/components/onboarding/welcome-form';
 import { getCurrentUser } from '@/lib/auth/server';
 import { ensureUserAndProfile } from '@/lib/auth/ensure-user-profile';
 
@@ -12,20 +11,20 @@ export async function generateMetadata() {
 }
 
 /**
- * /bienvenida — first-sign-in landing.
+ * /bienvenida — single-step onboarding (S-2.8).
  *
- * Stub for S-2.7. Ensures the User + Profile rows exist (defense-in-
- * depth: /auth/callback is the primary bootstrap point, but this
- * page catches any user that somehow slipped past without a Profile)
- * and shows a brief welcome.
+ * Shows a welcome header plus one short form: confirm-or-edit display
+ * name (required, pre-filled from Supabase user metadata or email
+ * prefix) and an optional DPI number (stored as free-form text per
+ * `project_core_thesis.md` — never validated).
  *
- * S-2.8 will replace the body with a single-step onboarding form
- * (DPI photo OR typed name + DPI number), plus marks
- * `onboardingCompleted = true` before routing to /dashboard. For
- * now, the "Empezar" button links directly to /dashboard.
+ * Submission flips `Profile.onboardingCompleted = true` and redirects
+ * to `/dashboard`. Users who already completed onboarding bounce
+ * straight to `/dashboard` without seeing the form again.
  *
- * Returning users who already finished onboarding are redirected
- * straight to /dashboard so they don't see the welcome again.
+ * `ensureUserAndProfile()` runs here as defense-in-depth — the primary
+ * bootstrap happens in `/auth/callback` (S-2.7), but if any user
+ * arrived here without Profile rows the helper catches it.
  */
 export default async function BienvenidaPage() {
   const authUser = await getCurrentUser();
@@ -38,17 +37,15 @@ export default async function BienvenidaPage() {
 
   return (
     <main className="bg-ifa-navy-50 flex min-h-dvh items-center justify-center px-4 py-10">
-      <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card w-full max-w-md p-8 text-center">
-        <div className="mb-6 flex flex-col items-center gap-3">
-          <Logo variant="icon" iconSize={48} className="text-ifa-navy-800" />
+      <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card w-full max-w-md p-8">
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <Logo variant="icon" iconSize={44} className="text-ifa-navy-800" />
           <h1 className="text-ifa-navy-900 text-2xl font-semibold tracking-tight">
             {t('title', { name: profile.displayName })}
           </h1>
           <p className="text-ifa-gray-700 text-sm leading-relaxed">{t('body')}</p>
         </div>
-        <Button asChild className="w-full">
-          <Link href="/dashboard">{t('cta')}</Link>
-        </Button>
+        <WelcomeForm initialDisplayName={profile.displayName} />
       </div>
     </main>
   );

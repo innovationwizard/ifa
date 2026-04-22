@@ -121,8 +121,20 @@
   "onboarding": {
     "welcome": {
       "title": "¡Hola, {name}!",
-      "body": "Gracias por entrar a IFA. Vamos a configurar tu espacio en unos pasos cortos.",
-      "cta": "Empezar"
+      "body": "Confirma tu nombre y, si quieres, déjanos tu DPI. Son dos datos cortos y listo.",
+      "nameLabel": "Tu nombre",
+      "namePlaceholder": "Así te vamos a decir",
+      "nameHelp": "Puedes cambiarlo después en Configuración.",
+      "dpiLabel": "Tu DPI o CUI (opcional)",
+      "dpiPlaceholder": "13 números, o déjalo en blanco",
+      "dpiHelp": "Es solo para ti. No lo verificamos ni se lo mandamos a nadie.",
+      "submit": "Guardar y entrar",
+      "submitting": "Guardando...",
+      "errors": {
+        "unauthenticated": "Tu sesión expiró. Vuelve a entrar.",
+        "validation": "Revisa los datos y vuelve a intentar.",
+        "server": "Algo falló de nuestro lado. Intenta de nuevo."
+      }
     }
   },
   "legal": {
