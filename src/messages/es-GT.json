@@ -40,6 +40,103 @@
       "phaseStatus": "Esta sección se construirá en una fase posterior del plan."
     }
   },
+  "transactionDetail": {
+    "back": "Volver a movimientos",
+    "tabs": {
+      "resumen": "Resumen",
+      "fel": "Factura (FEL)",
+      "tpv": "Tarjeta (TPV)",
+      "conciliacion": "Conciliación",
+      "asientos": "Asientos",
+      "auditoria": "Historial"
+    },
+    "type": {
+      "INCOME": "Ingreso",
+      "EXPENSE": "Gasto",
+      "TRANSFER": "Transferencia"
+    },
+    "resumen": {
+      "source": "Origen",
+      "status": "Estado",
+      "postingStatus": "Contabilidad",
+      "currency": "Moneda",
+      "merchantName": "Comercio",
+      "merchantNit": "NIT del comercio",
+      "category": "Categoría",
+      "createdAt": "Registrado",
+      "updatedAt": "Actualizado",
+      "reconciliationStatus": {
+        "UNMATCHED": "Sin emparejar",
+        "MATCHED": "Emparejado",
+        "MANUAL_MATCH": "Emparejado manual",
+        "EXCLUDED": "Excluido"
+      },
+      "postingStatus": {
+        "PENDING": "Pendiente",
+        "POSTED": "Contabilizado",
+        "REVERSED": "Revertido"
+      }
+    },
+    "common": {
+      "none": "—",
+      "cardMask": "•••• {last4}",
+      "seriesNumber": "{series}-{number}",
+      "percent": "{value}%"
+    },
+    "fel": {
+      "dteUuid": "UUID del DTE",
+      "dteType": "Tipo de DTE",
+      "seriesNumber": "Serie y número",
+      "certifier": "Certificador",
+      "nitEmisor": "NIT del emisor",
+      "nitReceptor": "NIT del receptor",
+      "certificationDate": "Certificado el",
+      "xmlStoragePath": "Ruta del XML"
+    },
+    "tpv": {
+      "acquirer": "Adquirente",
+      "authorizationCode": "Autorización",
+      "card": "Tarjeta",
+      "terminalId": "Terminal",
+      "batchNumber": "Lote",
+      "settlementDate": "Liquidación"
+    },
+    "conciliacion": {
+      "empty": "Este movimiento aún no está emparejado con otro.",
+      "matchType": "Tipo de empate",
+      "matchTypeValues": {
+        "AUTO_EXACT": "Automático (exacto)",
+        "AUTO_PROBABLE": "Automático (probable)",
+        "MANUAL": "Manual"
+      },
+      "confidence": "Confianza",
+      "reconciledAt": "Emparejado el",
+      "counterparty": "Contraparte"
+    },
+    "asientos": {
+      "empty": "Todavía no hay asientos contables para este movimiento.",
+      "entryNumber": "Asiento #"
+    },
+    "auditoria": {
+      "empty": "No hay historial para este movimiento.",
+      "actions": {
+        "CREATED": "Creado",
+        "CATEGORIZED": "Categorizado",
+        "RECONCILED": "Emparejado",
+        "UNRECONCILED": "Des-emparejado",
+        "POSTED": "Contabilizado",
+        "REVERSED": "Revertido",
+        "EDITED": "Editado",
+        "DUPLICATE_FLAGGED": "Marcado como duplicado",
+        "ANOMALY_FLAGGED": "Marcado como anómalo"
+      },
+      "actors": {
+        "USER": "Por ti",
+        "SYSTEM": "Sistema",
+        "AI": "IA"
+      }
+    }
+  },
   "transactions": {
     "title": "Tus movimientos",
     "subtitle": "Todo lo que entra y sale, ordenado por fecha.",
