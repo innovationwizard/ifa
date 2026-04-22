@@ -129,6 +129,38 @@
       }
     }
   },
+  "upgrade": {
+    "title": "Pasar a Empresa",
+    "subtitle": "Tu negocio tiene cosas que no caben en el plan personal. Aquí lo abrimos.",
+    "priceFormat": "${amount}",
+    "usd": "USD",
+    "perMonth": "al mes",
+    "priceChangeNotice": "Los precios pueden cambiar en cualquier momento, sin aviso previo.",
+    "features": {
+      "one": "Factura a tus clientes con DTE (facturas electrónicas).",
+      "two": "Conecta tus terminales de tarjeta (TPV) y ve los cobros al instante.",
+      "three": "Contabilidad automática: asientos, libros, estados.",
+      "four": "Invita a tu contador o socio al equipo."
+    },
+    "back": "Quedarme en el plan Personal",
+    "form": {
+      "nameLabel": "Nombre del negocio",
+      "namePlaceholder": "Así se llama tu negocio",
+      "nameHelp": "Puedes cambiarlo después en Configuración.",
+      "nitLabel": "NIT (opcional)",
+      "nitPlaceholder": "Tu NIT, si lo tienes a la mano",
+      "nitHelp": "Es opcional. Puedes agregarlo después cuando lo necesites para facturar.",
+      "submit": "Activar plan Empresa",
+      "submitting": "Activando...",
+      "errors": {
+        "unauthenticated": "Tu sesión expiró. Vuelve a entrar.",
+        "validation": "Revisa los datos y vuelve a intentar.",
+        "alreadyBusiness": "Tu cuenta ya es Empresa.",
+        "stripe": "No pudimos cambiar tu plan con el proveedor de pagos. Intenta otra vez en un minuto.",
+        "server": "Algo falló de nuestro lado. Intenta de nuevo."
+      }
+    }
+  },
   "onboarding": {
     "welcome": {
       "title": "¡Hola, {name}!",
