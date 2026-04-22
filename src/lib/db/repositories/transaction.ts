@@ -1,5 +1,12 @@
-import type { Prisma, ReconciliationStatus, Transaction, TransactionSource } from '@prisma/client';
+import type {
+  ReconciliationStatus,
+  Transaction,
+  TransactionSource,
+  TransactionType,
+} from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
+import { requireTenant } from '../tenant-context';
 
 /**
  * Transaction repository.
@@ -16,6 +23,33 @@ import { prisma } from '../prisma';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+
+export interface CreateManualInput {
+  amount: Prisma.Decimal | number | string;
+  date: Date;
+  type: TransactionType;
+  description: string;
+  currency?: string;
+  merchantName?: string;
+  merchantNit?: string;
+  category?: string;
+  /** Optional idempotency key — stashed in `externalId` as `idem:<key>`. */
+  idempotencyKey?: string;
+  /** User id performing the creation (goes into the TransactionAudit row). */
+  actorUserId: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export interface CreateManualResult {
+  /** `true` on fresh insert, `false` when an idempotency-key replay found an existing row. */
+  created: boolean;
+  transaction: Transaction;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
 
 export interface TransactionListCursor {
   /** Last row's id (UUIDv7). */
@@ -134,6 +168,90 @@ export const transactionRepo = {
       where: { transactionId },
       orderBy: { createdAt: 'desc' },
     });
+  },
+
+  /**
+   * Create a MANUAL transaction and its initial TransactionAudit row
+   * atomically.
+   *
+   * Idempotency: when `idempotencyKey` is provided, we stash it in
+   * `Transaction.externalId` (prefixed `idem:`) so the existing unique
+   * constraint on `(profileId, source, externalId)` does the dedup
+   * work. Re-submission with the same key returns the original row
+   * with `created: false`. Keys are scoped per-tenant because the
+   * tenancy extension auto-scopes the lookup.
+   *
+   * The returned `created` flag lets the route map HTTP status
+   * appropriately: `true` → 201, `false` → 200.
+   */
+  async createManualWithAudit(input: CreateManualInput): Promise<CreateManualResult> {
+    const externalId = input.idempotencyKey ? `idem:${input.idempotencyKey}` : null;
+
+    if (externalId) {
+      const existing = await prisma.transaction.findFirst({
+        where: { source: 'MANUAL', externalId },
+      });
+      if (existing) return { created: false, transaction: existing };
+    }
+
+    /*
+     * Extract tenant context explicitly and pass `profileId` in the
+     * create payload. TypeScript can't see the tenancy extension's
+     * runtime injection, so the unchecked create variant requires
+     * `profileId` in the shape. The extension verifies that the
+     * supplied value matches the context (identical here by
+     * construction) — harmless redundancy.
+     */
+    const { profileId } = requireTenant('Transaction', 'createManualWithAudit');
+
+    try {
+      const transaction = await prisma.$transaction(async (db) => {
+        const created = await db.transaction.create({
+          data: {
+            profileId,
+            source: 'MANUAL',
+            ...(externalId ? { externalId } : {}),
+            type: input.type,
+            amount: input.amount,
+            ...(input.currency ? { currency: input.currency } : {}),
+            date: input.date,
+            description: input.description,
+            ...(input.merchantName ? { merchantName: input.merchantName } : {}),
+            ...(input.merchantNit ? { merchantNit: input.merchantNit } : {}),
+            ...(input.category ? { category: input.category } : {}),
+            reconciliationStatus: 'UNMATCHED',
+          },
+        });
+        await db.transactionAudit.create({
+          data: {
+            transactionId: created.id,
+            action: 'CREATED',
+            performedBy: 'USER',
+            userId: input.actorUserId,
+            details: {
+              ...(input.ipAddress ? { ipAddress: input.ipAddress } : {}),
+              ...(input.userAgent ? { userAgent: input.userAgent } : {}),
+              ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+            },
+          },
+        });
+        return created;
+      });
+      return { created: true, transaction };
+    } catch (error) {
+      /*
+       * Race condition path: two concurrent POSTs with the same
+       * idempotency key — the first wins, the second trips the unique
+       * constraint. Look up the winner and treat as a replay.
+       */
+      if (isUniqueViolation(error) && externalId) {
+        const existing = await prisma.transaction.findFirst({
+          where: { source: 'MANUAL', externalId },
+        });
+        if (existing) return { created: false, transaction: existing };
+      }
+      throw error;
+    }
   },
 
   /**

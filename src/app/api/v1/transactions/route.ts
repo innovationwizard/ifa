@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/server';
 import { profileRepo, transactionRepo } from '@/lib/db/repositories';
 import { withTenant } from '@/lib/db/tenant-context';
-import { listTransactionsQuerySchema } from '@/lib/validators/transactions';
+import {
+  createTransactionBodySchema,
+  idempotencyKeySchema,
+  listTransactionsQuerySchema,
+} from '@/lib/validators/transactions';
 
 /**
  * GET /api/v1/transactions — cursor-paginated transaction feed.
@@ -105,4 +109,95 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         : null,
     },
   });
+}
+
+/**
+ * POST /api/v1/transactions — create a MANUAL transaction.
+ *
+ * Required body: `amount`, `date`, `type`, `description`.
+ * Optional: `currency` (default GTQ), `merchantName`, `merchantNit`,
+ * `category`.
+ *
+ * Idempotency-Key header (optional):
+ *   - 8–128 URL-safe characters
+ *   - Scoped per-tenant; the same key submitted by a different Profile
+ *     is treated as independent
+ *   - Dedup is schema-enforced via the
+ *     `(profileId, source, externalId)` unique constraint. The key
+ *     gets stashed in `externalId` as `idem:<key>`
+ *
+ * Response:
+ *   - 201 { data: Transaction }                            fresh insert
+ *   - 200 { data: Transaction, replayed: true }            idempotent
+ *                                                          replay
+ *   - 401 { error: 'unauthenticated' }
+ *   - 400 { error: 'invalid_body', issues }                Zod failures
+ *   - 400 { error: 'invalid_idempotency_key', issues }     header
+ *                                                          format fail
+ *   - 400 { error: 'no_profile' }
+ */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  }
+
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
+  }
+  const parsedBody = createTransactionBodySchema.safeParse(rawBody);
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { error: 'invalid_body', issues: parsedBody.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const rawKey = request.headers.get('Idempotency-Key');
+  let idempotencyKey: string | undefined;
+  if (rawKey !== null) {
+    const parsedKey = idempotencyKeySchema.safeParse(rawKey);
+    if (!parsedKey.success) {
+      return NextResponse.json(
+        { error: 'invalid_idempotency_key', issues: parsedKey.error.issues },
+        { status: 400 },
+      );
+    }
+    idempotencyKey = parsedKey.data;
+  }
+
+  const profiles = await profileRepo.findManyForUser(user.id);
+  const profile = profiles[0];
+  if (!profile) {
+    return NextResponse.json({ error: 'no_profile' }, { status: 400 });
+  }
+
+  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const userAgent = request.headers.get('user-agent') ?? undefined;
+
+  const body = parsedBody.data;
+  const result = await withTenant({ profileId: profile.id, userId: user.id }, () =>
+    transactionRepo.createManualWithAudit({
+      amount: body.amount,
+      date: body.date,
+      type: body.type,
+      description: body.description,
+      ...(body.currency ? { currency: body.currency } : {}),
+      ...(body.merchantName ? { merchantName: body.merchantName } : {}),
+      ...(body.merchantNit ? { merchantNit: body.merchantNit } : {}),
+      ...(body.category ? { category: body.category } : {}),
+      ...(idempotencyKey ? { idempotencyKey } : {}),
+      actorUserId: user.id,
+      ...(ipAddress ? { ipAddress } : {}),
+      ...(userAgent ? { userAgent } : {}),
+    }),
+  );
+
+  return NextResponse.json(
+    result.created ? { data: result.transaction } : { data: result.transaction, replayed: true },
+    { status: result.created ? 201 : 200 },
+  );
 }

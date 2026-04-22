@@ -55,3 +55,56 @@ export const listTransactionsQuerySchema = z
   );
 
 export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;
+
+/**
+ * Body validator for `POST /api/v1/transactions` (S-3.4).
+ *
+ * Matches the Transaction row's required fields (amount, date, type,
+ * description) and the common optional metadata (currency, merchant
+ * fields, category). Amount is a `number` at the API boundary — we
+ * accept both numeric and string inputs via `z.coerce.number()`;
+ * Prisma coerces to Decimal internally when writing to the
+ * `@db.Decimal(14, 2)` column.
+ *
+ * Range caps mirror the schema's `@db.Decimal(14, 2)` precision. Any
+ * amount with more than 2 decimal places is rejected — GTQ and USD
+ * both use centavo precision.
+ */
+const TRANSACTION_TYPE_VALUES = ['INCOME', 'EXPENSE', 'TRANSFER'] as const;
+
+export const createTransactionBodySchema = z.object({
+  amount: z.coerce
+    .number()
+    .finite()
+    .min(-9_999_999_999.99)
+    .max(9_999_999_999.99)
+    .refine((v) => Number.isInteger(Math.round(v * 100)) && Math.round(v * 100) / 100 === v, {
+      message: 'amount must have at most 2 decimal places',
+    }),
+  date: z.coerce.date(),
+  type: z.enum(TRANSACTION_TYPE_VALUES),
+  description: z.string().trim().min(1).max(1000),
+  currency: z
+    .string()
+    .trim()
+    .length(3)
+    .regex(/^[A-Z]{3}$/, 'currency must be a 3-letter ISO code')
+    .optional(),
+  merchantName: z.string().trim().min(1).max(200).optional(),
+  merchantNit: z.string().trim().min(1).max(50).optional(),
+  category: z.string().trim().min(1).max(100).optional(),
+});
+
+export type CreateTransactionBody = z.infer<typeof createTransactionBodySchema>;
+
+/**
+ * Idempotency-Key header validator. Permissive per RFC: 8–128 chars,
+ * URL-safe charset. Clients typically generate UUIDs but any stable
+ * token works.
+ */
+export const idempotencyKeySchema = z
+  .string()
+  .trim()
+  .min(8)
+  .max(128)
+  .regex(/^[A-Za-z0-9_.-]+$/, 'Idempotency-Key must be URL-safe (A-Z, a-z, 0-9, _, -, .)');
