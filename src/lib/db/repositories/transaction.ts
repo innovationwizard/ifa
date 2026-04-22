@@ -47,6 +47,17 @@ export interface CreateManualResult {
   transaction: Transaction;
 }
 
+/** Row shape consumed by `transactionRepo.createManyFromImport`. */
+export interface ImportRow {
+  externalId: string;
+  type: TransactionType;
+  amount: Prisma.Decimal | number | string;
+  currency: string;
+  date: Date;
+  description: string;
+  merchantNit?: string;
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
@@ -168,6 +179,40 @@ export const transactionRepo = {
       where: { transactionId },
       orderBy: { createdAt: 'desc' },
     });
+  },
+
+  /**
+   * Bulk insert for CSV / statement imports (S-3.6). Uses
+   * `createMany({ skipDuplicates: true })` so re-running the same
+   * import no-ops on already-seen rows (dedup via the
+   * `(profileId, source, externalId)` unique constraint). Returns
+   * the actual inserted count, which the caller uses to compute
+   * `duplicatesSkipped = batch.length - inserted`.
+   *
+   * Caller MUST be inside a `withTenant(...)` context. `profileId`
+   * is pulled from that context and passed explicitly in the data
+   * payload — same reason as `createManualWithAudit`: Prisma's
+   * unchecked-create shape requires it and TS can't see the
+   * tenancy-extension injection.
+   */
+  async createManyFromImport(rows: ImportRow[]): Promise<{ inserted: number }> {
+    const { profileId } = requireTenant('Transaction', 'createManyFromImport');
+    const result = await prisma.transaction.createMany({
+      data: rows.map((row) => ({
+        profileId,
+        source: 'BANK_CSV',
+        externalId: row.externalId,
+        type: row.type,
+        amount: row.amount,
+        currency: row.currency,
+        date: row.date,
+        description: row.description,
+        reconciliationStatus: 'UNMATCHED',
+        ...(row.merchantNit ? { merchantNit: row.merchantNit } : {}),
+      })),
+      skipDuplicates: true,
+    });
+    return { inserted: result.count };
   },
 
   /**

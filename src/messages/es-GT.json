@@ -40,6 +40,53 @@
       "phaseStatus": "Esta sección se construirá en una fase posterior del plan."
     }
   },
+  "imports": {
+    "title": "Subir estado de cuenta",
+    "subtitle": "Agarra el archivo CSV de tu banco y lo leemos por ti. Aceptamos el formato de BAC y Banco Industrial automáticamente.",
+    "breadcrumb": "Importar",
+    "upload": {
+      "prompt": "Haz clic para elegir un archivo CSV",
+      "hint": "Hasta 10 MB por archivo"
+    },
+    "preview": {
+      "detected": "Detectamos el formato de {bank}",
+      "genericLayout": "tu banco",
+      "lowConfidence": "No reconocimos todas las columnas. Revisa el mapeo abajo antes de continuar.",
+      "cancel": "Elegir otro archivo",
+      "confirm": "Importar movimientos",
+      "fields": {
+        "date": "Fecha",
+        "description": "Descripción",
+        "amount": "Monto",
+        "debit": "Salida",
+        "credit": "Entrada",
+        "merchantNit": "NIT",
+        "ignore": "No se importa"
+      }
+    },
+    "progress": {
+      "uploading": "Subiendo tu archivo...",
+      "importing": "Leyendo y guardando tus movimientos..."
+    },
+    "result": {
+      "title": "¡Listo!",
+      "imported": "Guardados",
+      "duplicates": "Repetidos (se saltaron)",
+      "failed": "Con errores",
+      "total": "Total en el archivo",
+      "failureNote": "{count} filas tenían errores y no se guardaron. Revisa tu archivo si quieres volver a intentar.",
+      "importAnother": "Subir otro archivo",
+      "goDashboard": "Ver mi dashboard"
+    },
+    "errors": {
+      "fileTooLarge": "El archivo pesa más de 10 MB. Por ahora solo aceptamos archivos más pequeños.",
+      "noHeaders": "No encontramos encabezados en el archivo. Asegúrate de que la primera fila sea los nombres de las columnas.",
+      "parseFailed": "No pudimos leer el archivo. Verifica que sea un CSV válido.",
+      "invalidMapping": "No pudimos detectar las columnas. Necesitamos al menos fecha, descripción y monto.",
+      "generic": "Algo falló al importar. Intenta de nuevo en un minuto.",
+      "retry": "Intentar de nuevo"
+    }
+  },
   "dashboard": {
     "empty": {
       "greeting": "¡Bienvenido, {name}!",

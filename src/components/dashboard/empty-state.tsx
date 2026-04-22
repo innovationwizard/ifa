@@ -22,9 +22,10 @@ interface EmptyDashboardProps {
  *   - frame statement upload as a fallback or workaround
  *   - use accounting / finance jargon (feedback_vocabulary memory)
  *
- * The CTA currently links to `/transacciones` where the module
- * placeholder is — the real upload form lands in a follow-up story
- * and will either live at /transacciones or /transacciones/subir.
+ * The CTA links to `/transacciones/importar` — the CSV import wizard
+ * landed in S-3.5/S-3.6. Multi-format ingestion (PDF, XLS, OFX, QIF)
+ * arrives in the immediately-after-MVP follow-up per the Holy Grail
+ * memory.
  */
 export async function EmptyDashboard({ firstName }: EmptyDashboardProps) {
   const t = await getTranslations('dashboard.empty');
@@ -55,7 +56,7 @@ export async function EmptyDashboard({ firstName }: EmptyDashboardProps) {
         </ol>
 
         <Button asChild className="w-full">
-          <Link href="/transacciones">{t('cta')}</Link>
+          <Link href="/transacciones/importar">{t('cta')}</Link>
         </Button>
       </div>
 

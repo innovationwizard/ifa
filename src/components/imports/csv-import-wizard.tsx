@@ -1,0 +1,372 @@
+'use client';
+
+import { useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import Papa from 'papaparse';
+import { CheckCircle2, FileUp, AlertTriangle, Loader2 } from 'lucide-react';
+import { detectColumns, type ColumnMapping, type DetectedBank } from '@/lib/imports/column-detect';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+/**
+ * Client-side state machine for /transacciones/importar (S-3.5).
+ *
+ *   idle       → user hasn't picked a file
+ *   previewing → file parsed client-side, mapping auto-detected,
+ *                first rows rendered for user review
+ *   uploading  → file being PUT to Supabase Storage via signed URL
+ *   importing  → server is parsing + inserting rows
+ *   done       → server returned a summary
+ *   error      → anything failed; message surfaced as a retry
+ *
+ * Local preview uses papaparse in the browser — same library as the
+ * server, so detection/parsing behavior matches what will actually
+ * happen on commit. The sample is capped at 50 rows for snappy UI;
+ * the full file goes to the server regardless.
+ */
+
+type Wizard =
+  | { stage: 'idle' }
+  | {
+      stage: 'previewing';
+      file: File;
+      headers: string[];
+      mapping: ColumnMapping;
+      detectedBank: DetectedBank;
+      confidence: number;
+      sampleRows: Record<string, string>[];
+    }
+  | { stage: 'uploading'; file: File }
+  | { stage: 'importing' }
+  | { stage: 'done'; summary: ImportSummaryResponse }
+  | { stage: 'error'; message: string };
+
+interface ImportSummaryResponse {
+  totalRows: number;
+  imported: number;
+  duplicatesSkipped: number;
+  failed: number;
+  detectedBank: string;
+}
+
+interface PrepareResponse {
+  data: { signedUrl: string; token: string; path: string };
+}
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const SAMPLE_ROWS = 10;
+
+export function CsvImportWizard() {
+  const t = useTranslations('imports');
+  const router = useRouter();
+  const [state, setState] = useState<Wizard>({ stage: 'idle' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function reset(): void {
+    setState({ stage: 'idle' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function handleFileChosen(file: File): void {
+    if (file.size > MAX_FILE_BYTES) {
+      setState({ stage: 'error', message: t('errors.fileTooLarge') });
+      return;
+    }
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      preview: SAMPLE_ROWS + 1,
+      transformHeader: (h) => h.trim(),
+      complete: (result) => {
+        const headers = result.meta.fields ?? [];
+        if (headers.length === 0) {
+          setState({ stage: 'error', message: t('errors.noHeaders') });
+          return;
+        }
+        const detection = detectColumns(headers);
+        setState({
+          stage: 'previewing',
+          file,
+          headers,
+          mapping: detection.mapping,
+          detectedBank: detection.detectedBank,
+          confidence: detection.confidence,
+          sampleRows: result.data.slice(0, SAMPLE_ROWS),
+        });
+      },
+      error: () => {
+        setState({ stage: 'error', message: t('errors.parseFailed') });
+      },
+    });
+  }
+
+  async function handleImport(previewing: Extract<Wizard, { stage: 'previewing' }>): Promise<void> {
+    setState({ stage: 'uploading', file: previewing.file });
+    try {
+      const prepareRes = await fetch('/api/v1/transactions/import/prepare', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ fileName: previewing.file.name }),
+      });
+      if (!prepareRes.ok) {
+        throw new Error('prepare_failed');
+      }
+      const prepare = (await prepareRes.json()) as PrepareResponse;
+
+      /*
+       * Upload directly to Supabase via the signed URL — bypasses
+       * Vercel's 4.5MB body limit. Supabase accepts PUT with the
+       * raw file body; the signed URL already encodes auth + path.
+       */
+      const uploadRes = await fetch(prepare.data.signedUrl, {
+        method: 'PUT',
+        headers: { 'content-type': 'text/csv' },
+        body: previewing.file,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('upload_failed');
+      }
+
+      setState({ stage: 'importing' });
+
+      const importRes = await fetch('/api/v1/transactions/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          storagePath: prepare.data.path,
+          mapping: previewing.mapping,
+        }),
+      });
+      if (!importRes.ok) {
+        const body = (await importRes.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? 'import_failed');
+      }
+      const summary = (await importRes.json()) as { data: ImportSummaryResponse };
+      setState({ stage: 'done', summary: summary.data });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message === 'invalid_mapping'
+          ? t('errors.invalidMapping')
+          : t('errors.generic');
+      setState({ stage: 'error', message });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {state.stage === 'idle' && <IdleStep onChoose={handleFileChosen} inputRef={fileInputRef} />}
+
+      {state.stage === 'previewing' && (
+        <PreviewStep
+          state={state}
+          onConfirm={() => {
+            void handleImport(state);
+          }}
+          onCancel={reset}
+        />
+      )}
+
+      {(state.stage === 'uploading' || state.stage === 'importing') && (
+        <ProgressStep
+          label={state.stage === 'uploading' ? t('progress.uploading') : t('progress.importing')}
+        />
+      )}
+
+      {state.stage === 'done' && (
+        <ResultStep
+          summary={state.summary}
+          onAnother={reset}
+          onDashboard={() => router.push('/dashboard')}
+        />
+      )}
+
+      {state.stage === 'error' && (
+        <div className="flex flex-col gap-4">
+          <Alert variant="destructive" role="alert">
+            <AlertDescription>{state.message}</AlertDescription>
+          </Alert>
+          <Button variant="outline" onClick={reset}>
+            {t('errors.retry')}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IdleStep({
+  onChoose,
+  inputRef,
+}: {
+  onChoose: (file: File) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}) {
+  const t = useTranslations('imports');
+  return (
+    <label
+      className="border-ifa-gray-300 hover:border-ifa-teal-400 focus-within:border-ifa-teal-600 rounded-ifa-card flex cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed p-10 text-center transition-colors"
+      htmlFor="csv-file"
+    >
+      <div className="bg-ifa-teal-100 text-ifa-teal-600 flex size-16 items-center justify-center rounded-full">
+        <FileUp className="size-7" aria-hidden />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-ifa-navy-900 text-base font-medium">{t('upload.prompt')}</span>
+        <span className="text-ifa-gray-500 text-xs">{t('upload.hint')}</span>
+      </div>
+      <input
+        ref={inputRef}
+        id="csv-file"
+        type="file"
+        accept=".csv,text/csv"
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onChoose(file);
+        }}
+      />
+    </label>
+  );
+}
+
+function PreviewStep({
+  state,
+  onConfirm,
+  onCancel,
+}: {
+  state: Extract<Wizard, { stage: 'previewing' }>;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations('imports');
+  const bankLabel =
+    state.detectedBank === 'BAC'
+      ? 'BAC'
+      : state.detectedBank === 'BANCO_INDUSTRIAL'
+        ? 'Banco Industrial'
+        : t('preview.genericLayout');
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="text-ifa-teal-600 size-4" aria-hidden />
+          <span className="text-ifa-navy-900 text-sm font-medium">
+            {t('preview.detected', { bank: bankLabel })}
+          </span>
+        </div>
+        {state.confidence < 0.6 && (
+          <Alert variant="default" role="alert">
+            <AlertDescription className="flex items-start gap-2 text-xs">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>{t('preview.lowConfidence')}</span>
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      <div className="rounded-ifa-card border-ifa-gray-300 overflow-x-auto border">
+        <table className="w-full text-xs">
+          <thead className="bg-ifa-navy-50 text-ifa-navy-900">
+            <tr>
+              {state.headers.map((h) => (
+                <th key={h} className="px-3 py-2 text-left font-medium">
+                  <div className="flex flex-col gap-0.5">
+                    <span>{h}</span>
+                    <span className="text-ifa-gray-500 text-[10px] tracking-wide uppercase">
+                      {t(`preview.fields.${state.mapping[h] ?? 'ignore'}`)}
+                    </span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {state.sampleRows.map((row, idx) => (
+              <tr key={idx} className="border-ifa-gray-300 border-t">
+                {state.headers.map((h) => (
+                  <td key={h} className="text-ifa-gray-700 px-3 py-2">
+                    {row[h] ?? ''}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <Button variant="outline" onClick={onCancel}>
+          {t('preview.cancel')}
+        </Button>
+        <Button onClick={onConfirm}>{t('preview.confirm')}</Button>
+      </div>
+    </div>
+  );
+}
+
+function ProgressStep({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-10 text-center">
+      <Loader2 className="text-ifa-teal-600 size-6 animate-spin" aria-hidden />
+      <span className="text-ifa-gray-700 text-sm">{label}</span>
+    </div>
+  );
+}
+
+function ResultStep({
+  summary,
+  onAnother,
+  onDashboard,
+}: {
+  summary: ImportSummaryResponse;
+  onAnother: () => void;
+  onDashboard: () => void;
+}) {
+  const t = useTranslations('imports');
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="bg-ifa-teal-100 text-ifa-teal-600 flex size-16 items-center justify-center rounded-full">
+          <CheckCircle2 className="size-7" aria-hidden />
+        </div>
+        <h2 className="text-ifa-navy-900 text-xl font-semibold">{t('result.title')}</h2>
+      </div>
+
+      <dl className="bg-ifa-white rounded-ifa-card shadow-ifa-card grid grid-cols-2 gap-4 p-6">
+        <Metric value={summary.imported} label={t('result.imported')} />
+        <Metric value={summary.duplicatesSkipped} label={t('result.duplicates')} />
+        <Metric value={summary.failed} label={t('result.failed')} />
+        <Metric value={summary.totalRows} label={t('result.total')} />
+      </dl>
+
+      {summary.failed > 0 && (
+        <Alert variant="default" role="alert">
+          <AlertDescription className="text-xs">
+            {t('result.failureNote', { count: summary.failed })}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <Button variant="outline" asChild>
+          <Link href="#" onClick={onAnother}>
+            {t('result.importAnother')}
+          </Link>
+        </Button>
+        <Button onClick={onDashboard}>{t('result.goDashboard')}</Button>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <dt className="text-ifa-gray-500 text-xs tracking-wide uppercase">{label}</dt>
+      <dd className="text-ifa-navy-900 text-2xl font-semibold tabular-nums">{value}</dd>
+    </div>
+  );
+}
