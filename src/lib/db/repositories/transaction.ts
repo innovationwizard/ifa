@@ -1,4 +1,4 @@
-import type { Prisma, Transaction } from '@prisma/client';
+import type { Prisma, ReconciliationStatus, Transaction, TransactionSource } from '@prisma/client';
 import { prisma } from '../prisma';
 
 /**
@@ -9,11 +9,46 @@ import { prisma } from '../prisma';
  * reads and `data.profileId` on creates; it throws
  * `TenantContextMissingError` if a caller forgets the wrapper.
  *
- * Surface is kept narrow on purpose and grows as feature stories need
- * new methods. S-2.9 (empty-state dashboard) only needs `count`; the
- * upload-and-parse flow that comes next will add `createMany`, the
- * transactions list will add `findMany` with pagination, etc.
+ * Surface grows as feature stories need new methods. S-2.9 added
+ * `count`; S-3.1 adds `list` (cursor-paginated, filter-capable). The
+ * upload-and-parse and detail stories add `createMany` / `findUnique`.
  */
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+
+export interface TransactionListCursor {
+  /** Last row's id (UUIDv7). */
+  id: string;
+  /** Last row's date — `@db.Date` column, so time-of-day is zeroed. */
+  date: Date;
+}
+
+export interface TransactionListFilters {
+  source?: TransactionSource;
+  reconciliationStatus?: ReconciliationStatus;
+  dateFrom?: Date;
+  dateTo?: Date;
+  /** Accepts any Prisma-Decimal-compatible value (number, string, Decimal). */
+  amountMin?: Prisma.Decimal | number | string;
+  amountMax?: Prisma.Decimal | number | string;
+  merchantNit?: string;
+  /** Free-text search against `description`. Case-insensitive ILIKE. */
+  q?: string;
+}
+
+export interface TransactionListArgs {
+  cursor?: TransactionListCursor | null;
+  limit?: number;
+  filters?: TransactionListFilters;
+}
+
+export interface TransactionListResult {
+  data: Transaction[];
+  nextCursor: TransactionListCursor | null;
+  hasMore: boolean;
+}
+
 export const transactionRepo = {
   count(args: Prisma.TransactionCountArgs = {}): Promise<number> {
     return prisma.transaction.count(args);
@@ -22,6 +57,101 @@ export const transactionRepo = {
   findFirst(args: Prisma.TransactionFindFirstArgs): Promise<Transaction | null> {
     return prisma.transaction.findFirst(args);
   },
+
+  /**
+   * Cursor-paginated list with optional filters.
+   *
+   * Ordering: `date DESC, id DESC`. UUIDv7 ids are time-ordered so the
+   * secondary sort lines up with "newest first" without surprises.
+   *
+   * Pagination is keyset, not offset — the `cursor` is the last row's
+   * `(id, date)` and the next page fetches strictly-older rows. This
+   * sidesteps offset's "rows shift under you between pages" problem.
+   *
+   * `limit` clamps to [1, 200] with a default of 50. The `take: limit + 1`
+   * trick lets us detect `hasMore` without a separate COUNT query.
+   *
+   * Full-text `q` uses Prisma's case-insensitive `contains`, which
+   * generates `ILIKE`. At larger tables this wants the pg_trgm GIN
+   * index documented in scaffolding §S-1.7 and deferred to the formal
+   * migration transition (runbook §2.2) — correctness is identical now;
+   * performance degrades gracefully until that lands.
+   */
+  async list(args: TransactionListArgs = {}): Promise<TransactionListResult> {
+    const limit = clampLimit(args.limit);
+    const cursor = args.cursor ?? null;
+    const where = buildTransactionListWhere(args.filters ?? {}, cursor);
+
+    const rows = await prisma.transaction.findMany({
+      where,
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+    });
+
+    const hasMore = rows.length > limit;
+    const data = hasMore ? rows.slice(0, limit) : rows;
+    const last = data[data.length - 1];
+    const nextCursor: TransactionListCursor | null =
+      hasMore && last ? { id: last.id, date: last.date } : null;
+
+    return { data, nextCursor, hasMore };
+  },
 };
 
 export type TransactionRepo = typeof transactionRepo;
+
+/**
+ * Build the Prisma `where` input for `transactionRepo.list`.
+ *
+ * Extracted so unit tests can verify the filter → Prisma mapping and
+ * the cursor composition rules without touching a real database.
+ */
+export function buildTransactionListWhere(
+  filters: TransactionListFilters,
+  cursor: TransactionListCursor | null,
+): Prisma.TransactionWhereInput {
+  const base: Prisma.TransactionWhereInput = {};
+
+  if (filters.source) base.source = filters.source;
+  if (filters.reconciliationStatus) base.reconciliationStatus = filters.reconciliationStatus;
+
+  if (filters.dateFrom !== undefined || filters.dateTo !== undefined) {
+    base.date = {
+      ...(filters.dateFrom !== undefined ? { gte: filters.dateFrom } : {}),
+      ...(filters.dateTo !== undefined ? { lte: filters.dateTo } : {}),
+    };
+  }
+
+  if (filters.amountMin !== undefined || filters.amountMax !== undefined) {
+    base.amount = {
+      ...(filters.amountMin !== undefined ? { gte: filters.amountMin } : {}),
+      ...(filters.amountMax !== undefined ? { lte: filters.amountMax } : {}),
+    };
+  }
+
+  if (filters.merchantNit) base.merchantNit = filters.merchantNit;
+  if (filters.q) base.description = { contains: filters.q, mode: 'insensitive' };
+
+  if (!cursor) return base;
+
+  /*
+   * Cursor composition: wrap both the base filters AND the cursor's
+   * strict-inequality OR in a top-level AND. This avoids ambiguity
+   * when the base filters already constrain `date` (e.g. dateFrom)
+   * and the cursor's OR branches also reference `date`.
+   */
+  return {
+    AND: [
+      base,
+      {
+        OR: [{ date: { lt: cursor.date } }, { date: cursor.date, id: { lt: cursor.id } }],
+      },
+    ],
+  };
+}
+
+export function clampLimit(raw: number | undefined): number {
+  const value = raw ?? DEFAULT_LIMIT;
+  if (!Number.isFinite(value)) return DEFAULT_LIMIT;
+  return Math.min(Math.max(Math.floor(value), 1), MAX_LIMIT);
+}
