@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertTriangle, FileUp, Loader2 } from 'lucide-react';
+import { AlertTriangle, Copy, FileUp, Loader2 } from 'lucide-react';
 import { Money } from '@/components/primitives/money';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
   type FeedFilters,
 } from '@/lib/transactions/filters';
 import { downloadRowsAsCsv } from '@/lib/transactions/csv-export';
+import { hasActiveDuplicateFlag } from '@/lib/transactions/duplicate-detection';
 import { FeedFiltersPanel } from './feed-filters';
 import { BulkActionsBar } from './bulk-actions-bar';
 
@@ -51,6 +52,8 @@ interface FeedRow {
   source: string;
   reconciliationStatus: string;
   type: string;
+  /** S-3.11 — set when an unresolved `possibleDuplicateOf` is present. */
+  possibleDuplicate: boolean;
 }
 
 interface PageResponse {
@@ -324,7 +327,18 @@ function TransactionRow({
         style={{ height: height - 16 }}
       >
         <span className="text-ifa-gray-700 text-xs tabular-nums">{row.date}</span>
-        <span className="text-ifa-navy-900 truncate text-sm">{row.description}</span>
+        <span className="text-ifa-navy-900 flex min-w-0 items-center gap-2 truncate text-sm">
+          <span className="truncate">{row.description}</span>
+          {row.possibleDuplicate && (
+            <span
+              className="bg-ifa-gold-100 text-ifa-navy-900 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase"
+              title={t('feed.duplicateBadge')}
+            >
+              <Copy className="size-2.5" aria-hidden />
+              {t('feed.duplicateBadge')}
+            </span>
+          )}
+        </span>
         <Money
           amount={amountValue}
           currency={row.currency}
@@ -380,6 +394,7 @@ function toFeedRow(raw: Record<string, unknown>): FeedRow {
     source: pickString(raw.source),
     reconciliationStatus: pickString(raw.reconciliationStatus),
     type: pickString(raw.type),
+    possibleDuplicate: hasActiveDuplicateFlag(raw.metadata),
   };
 }
 

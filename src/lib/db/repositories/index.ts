@@ -31,4 +31,14 @@ export { userRepo } from './user';
 export type { UserRepo } from './user';
 
 export { transactionRepo } from './transaction';
-export type { TransactionRepo } from './transaction';
+export type {
+  CreateManualInput,
+  CreateManualResult,
+  ImportRow,
+  TransactionRepo,
+  TransactionDetail,
+  TransactionListArgs,
+  TransactionListCursor,
+  TransactionListFilters,
+  TransactionListResult,
+} from './transaction';

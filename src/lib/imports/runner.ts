@@ -1,7 +1,12 @@
 import Papa from 'papaparse';
-import { transactionRepo } from '@/lib/db/repositories';
+import { transactionRepo, type ImportRow } from '@/lib/db/repositories';
+import {
+  amountToString,
+  duplicateWindow,
+  tripletKey,
+} from '@/lib/transactions/duplicate-detection';
 import { detectColumns, validateMapping, type ColumnMapping } from './column-detect';
-import { mapRows, type RowError } from './csv-parser';
+import { mapRows, type ParsedTransaction, type RowError } from './csv-parser';
 
 /**
  * CSV import orchestrator (S-3.6).
@@ -69,9 +74,11 @@ export async function runImport(input: RunImportInput): Promise<ImportSummary> {
 
   const { transactions, errors } = mapRows(parsed.data, mapping);
 
+  const withDuplicateFlags = await attachDuplicateFlags(transactions);
+
   let imported = 0;
   let duplicatesSkipped = 0;
-  for (const batch of chunks(transactions, BATCH_SIZE)) {
+  for (const batch of chunks(withDuplicateFlags, BATCH_SIZE)) {
     const { inserted } = await transactionRepo.createManyFromImport(batch);
     imported += inserted;
     duplicatesSkipped += batch.length - inserted;
@@ -91,6 +98,58 @@ function* chunks<T>(array: T[], size: number): Generator<T[]> {
   for (let i = 0; i < array.length; i += size) {
     yield array.slice(i, i + size);
   }
+}
+
+/**
+ * S-3.11 batch duplicate detection. Single prefetch over the widest
+ * date window spanning the batch, then in-memory triplet lookup per
+ * row. One DB query regardless of batch size — keeps the per-row
+ * <50ms budget intact even at 500+ rows.
+ *
+ * Only flags via `metadata.possibleDuplicateOf`; never suppresses
+ * inserts. The existing `(profileId, source, externalId)` unique
+ * constraint remains the source of truth for "exact same row
+ * imported twice"; this helper catches the *cross-source* case
+ * (e.g. a prior MANUAL entry for the same purchase).
+ */
+async function attachDuplicateFlags(rows: ParsedTransaction[]): Promise<ImportRow[]> {
+  if (rows.length === 0) return [];
+
+  let minDate = rows[0]!.date;
+  let maxDate = rows[0]!.date;
+  for (const row of rows) {
+    if (row.date < minDate) minDate = row.date;
+    if (row.date > maxDate) maxDate = row.date;
+  }
+  const { gte } = duplicateWindow(minDate);
+  const { lte } = duplicateWindow(maxDate);
+  const candidates = await transactionRepo.findDuplicateCandidatesInRange(gte, lte);
+  const index = new Map<string, string>();
+  for (const c of candidates) {
+    index.set(
+      tripletKey({ date: c.date, amount: amountToString(c.amount), description: c.description }),
+      c.id,
+    );
+  }
+
+  return rows.map((row) => {
+    const key = tripletKey({
+      date: row.date,
+      amount: amountToString(row.amount),
+      description: row.description,
+    });
+    const match = index.get(key);
+    const base: ImportRow = {
+      externalId: row.externalId,
+      type: row.type,
+      amount: row.amount,
+      currency: row.currency,
+      date: row.date,
+      description: row.description,
+      ...(row.merchantNit ? { merchantNit: row.merchantNit } : {}),
+    };
+    return match ? { ...base, metadata: { possibleDuplicateOf: match } } : base;
+  });
 }
 
 export class ImportConfigurationError extends Error {

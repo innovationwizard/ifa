@@ -6,9 +6,11 @@ import { z } from 'zod';
 import { Money } from '@/components/primitives/money';
 import { Badge } from '@/components/ui/badge';
 import { DetailTabsShell, type TabDef } from '@/components/transactions/detail-tabs-shell';
+import { DuplicateBanner } from '@/components/transactions/duplicate-banner';
 import { getCurrentUser } from '@/lib/auth/server';
 import { profileRepo, transactionRepo } from '@/lib/db/repositories';
 import { withTenant } from '@/lib/db/tenant-context';
+import { readDuplicateMetadata } from '@/lib/transactions/duplicate-detection';
 
 /**
  * /transacciones/[id] — transaction detail (S-3.8).
@@ -101,6 +103,10 @@ export default async function TransactionDetailPage({ params }: PageProps) {
     content: <AuditoriaTab audits={audits} />,
   });
 
+  const duplicateMeta = readDuplicateMetadata(transaction.metadata);
+  const showDuplicateBanner =
+    Boolean(duplicateMeta.possibleDuplicateOf) && !duplicateMeta.duplicateDismissed;
+
   return (
     <div className="flex flex-col gap-6">
       <Link
@@ -110,6 +116,13 @@ export default async function TransactionDetailPage({ params }: PageProps) {
         <ArrowLeft className="size-4" aria-hidden />
         {t('back')}
       </Link>
+
+      {showDuplicateBanner && duplicateMeta.possibleDuplicateOf && (
+        <DuplicateBanner
+          transactionId={transaction.id}
+          possibleDuplicateOf={duplicateMeta.possibleDuplicateOf}
+        />
+      )}
 
       <DetailHero transaction={transaction} />
 

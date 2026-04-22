@@ -56,6 +56,12 @@ export interface ImportRow {
   date: Date;
   description: string;
   merchantNit?: string;
+  /**
+   * Optional JSONB payload written as-is to `Transaction.metadata`.
+   * Populated by the runner with `{ possibleDuplicateOf: ... }` when
+   * duplicate detection flags the row (S-3.11).
+   */
+  metadata?: Prisma.InputJsonValue;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -182,6 +188,79 @@ export const transactionRepo = {
   },
 
   /**
+   * Single-row duplicate lookup (S-3.11). Returns the id of a
+   * candidate transaction with the same (date, amount, description)
+   * within the ±90d window, or null if none.
+   *
+   * Excludes the incoming row's own id so a re-run after insert
+   * doesn't flag the just-created row against itself.
+   */
+  async findDuplicateCandidate(args: {
+    date: Date;
+    amount: Prisma.Decimal | number | string;
+    description: string;
+    excludeId?: string;
+    windowDays?: number;
+  }): Promise<{ id: string } | null> {
+    const days = args.windowDays ?? 90;
+    const gte = new Date(
+      Date.UTC(args.date.getUTCFullYear(), args.date.getUTCMonth(), args.date.getUTCDate() - days),
+    );
+    const lte = new Date(
+      Date.UTC(args.date.getUTCFullYear(), args.date.getUTCMonth(), args.date.getUTCDate() + days),
+    );
+    return prisma.transaction.findFirst({
+      where: {
+        date: { gte, lte },
+        amount: args.amount,
+        description: args.description,
+        ...(args.excludeId ? { id: { not: args.excludeId } } : {}),
+      },
+      select: { id: true },
+      orderBy: { date: 'asc' },
+    });
+  },
+
+  /**
+   * Batch-lookup variant used by the CSV import path (S-3.6). Pulls
+   * all candidate rows in the widest date window spanning the batch
+   * and returns their minimal (id, date, amount, description) so the
+   * caller can build an in-memory triplet index. One query instead of
+   * N — keeps the <50ms / per row acceptance criterion intact even
+   * at 500-row batches.
+   */
+  findDuplicateCandidatesInRange(
+    dateFrom: Date,
+    dateTo: Date,
+  ): Promise<{ id: string; date: Date; amount: Prisma.Decimal; description: string }[]> {
+    return prisma.transaction.findMany({
+      where: { date: { gte: dateFrom, lte: dateTo } },
+      select: { id: true, date: true, amount: true, description: true },
+    });
+  },
+
+  /**
+   * Flip `metadata.duplicateDismissed = true` on a row the user has
+   * acknowledged. Preserves any other metadata keys the row already
+   * carries (FEL raw payload echoes, import key, etc.).
+   */
+  async markDuplicateDismissed(transactionId: string): Promise<void> {
+    const row = await prisma.transaction.findFirst({
+      where: { id: transactionId },
+      select: { metadata: true },
+    });
+    if (!row) return;
+    const current =
+      row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+        ? (row.metadata as Record<string, unknown>)
+        : {};
+    await prisma.transaction.update({
+      where: { id: transactionId },
+      data: { metadata: { ...current, duplicateDismissed: true } },
+    });
+  },
+
+  /**
    * Bulk insert for CSV / statement imports (S-3.6). Uses
    * `createMany({ skipDuplicates: true })` so re-running the same
    * import no-ops on already-seen rows (dedup via the
@@ -209,6 +288,7 @@ export const transactionRepo = {
         description: row.description,
         reconciliationStatus: 'UNMATCHED',
         ...(row.merchantNit ? { merchantNit: row.merchantNit } : {}),
+        ...(row.metadata !== undefined ? { metadata: row.metadata } : {}),
       })),
       skipDuplicates: true,
     });
@@ -249,6 +329,19 @@ export const transactionRepo = {
      */
     const { profileId } = requireTenant('Transaction', 'createManualWithAudit');
 
+    /*
+     * S-3.11 duplicate detection: pre-insert lookup, stashes the
+     * candidate id into `metadata.possibleDuplicateOf` on the new
+     * row. One indexed query per manual create; negligible added
+     * latency vs the <50ms acceptance budget.
+     */
+    const candidate = await this.findDuplicateCandidate({
+      date: input.date,
+      amount: input.amount,
+      description: input.description,
+    });
+    const metadata = candidate ? { possibleDuplicateOf: candidate.id } : undefined;
+
     try {
       const transaction = await prisma.$transaction(async (db) => {
         const created = await db.transaction.create({
@@ -265,6 +358,7 @@ export const transactionRepo = {
             ...(input.merchantNit ? { merchantNit: input.merchantNit } : {}),
             ...(input.category ? { category: input.category } : {}),
             reconciliationStatus: 'UNMATCHED',
+            ...(metadata ? { metadata } : {}),
           },
         });
         await db.transactionAudit.create({
