@@ -40,6 +40,50 @@
       "phaseStatus": "Esta sección se construirá en una fase posterior del plan."
     }
   },
+  "transactions": {
+    "title": "Tus movimientos",
+    "subtitle": "Todo lo que entra y sale, ordenado por fecha.",
+    "importCta": "Subir estado de cuenta",
+    "sources": {
+      "FEL": "Factura",
+      "TPV": "Tarjeta",
+      "BANK_CSV": "Banco",
+      "MANUAL": "Manual"
+    },
+    "feed": {
+      "loading": "Cargando más...",
+      "endOfList": "Esto es todo lo que tenemos.",
+      "loadError": "No pudimos cargar tus movimientos. Intenta de nuevo en un minuto.",
+      "emptyZero": "Aún no hay movimientos. Sube un estado de cuenta de tu banco para empezar.",
+      "emptyFiltered": "Ningún movimiento coincide con tus filtros. Prueba ampliar la búsqueda."
+    },
+    "filters": {
+      "heading": "Filtrar",
+      "clear": "Limpiar",
+      "search": "Buscar",
+      "searchPlaceholder": "Comercio, descripción...",
+      "source": "Origen",
+      "anySource": "Cualquier origen",
+      "sourceValues": {
+        "FEL": "Factura (FEL)",
+        "TPV": "Tarjeta (TPV)",
+        "BANK_CSV": "Banco",
+        "MANUAL": "Manual"
+      },
+      "status": "Estado",
+      "anyStatus": "Cualquier estado",
+      "statusValues": {
+        "UNMATCHED": "Sin emparejar",
+        "MATCHED": "Emparejado",
+        "MANUAL_MATCH": "Emparejado manual",
+        "EXCLUDED": "Excluido"
+      },
+      "dateFrom": "Desde",
+      "dateTo": "Hasta",
+      "amountMin": "Monto min.",
+      "amountMax": "Monto max."
+    }
+  },
   "imports": {
     "title": "Subir estado de cuenta",
     "subtitle": "Agarra el archivo CSV de tu banco y lo leemos por ti. Aceptamos el formato de BAC y Banco Industrial automáticamente.",
