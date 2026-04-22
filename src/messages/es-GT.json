@@ -178,6 +178,16 @@
       "emptyZero": "Aún no hay movimientos. Sube un estado de cuenta de tu banco para empezar.",
       "emptyFiltered": "Ningún movimiento coincide con tus filtros. Prueba ampliar la búsqueda."
     },
+    "bulk": {
+      "selectAll": "Seleccionar todo",
+      "selectRow": "Seleccionar este movimiento",
+      "loadedNote": "Solo lo que ya cargaste",
+      "selectedCount": "{count, plural, =1 {1 seleccionado} other {# seleccionados}}",
+      "categorizePlaceholder": "Categoría",
+      "categorizeSoon": "Próximamente",
+      "exportCsv": "Exportar a CSV",
+      "clear": "Limpiar"
+    },
     "filters": {
       "heading": "Filtrar",
       "clear": "Limpiar",

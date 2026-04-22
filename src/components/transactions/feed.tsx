@@ -9,13 +9,16 @@ import { AlertTriangle, FileUp, Loader2 } from 'lucide-react';
 import { Money } from '@/components/primitives/money';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   filtersFromSearchParams,
   filtersToSearchParams,
   isFilterEmpty,
   type FeedFilters,
 } from '@/lib/transactions/filters';
+import { downloadRowsAsCsv } from '@/lib/transactions/csv-export';
 import { FeedFiltersPanel } from './feed-filters';
+import { BulkActionsBar } from './bulk-actions-bar';
 
 /**
  * Virtualized transaction feed (S-3.7).
@@ -75,8 +78,25 @@ export function TransactionsFeed() {
   const [hasMore, setHasMore] = useState(true);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const toggleRow = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
 
   const fetchPage = useCallback(
     async (
@@ -121,6 +141,7 @@ export function TransactionsFeed() {
     setRows([]);
     setCursor(null);
     setHasMore(true);
+    setSelectedIds(new Set());
     void fetchPage(filtersFromSearchParams(new URLSearchParams(filtersKey)), null);
   }, [filtersKey, fetchPage]);
 
@@ -169,88 +190,154 @@ export function TransactionsFeed() {
   const showEmpty = status === 'idle' && rows.length === 0;
   const emptyVariant: 'filtered' | 'zero' = isFilterEmpty(filters) ? 'zero' : 'filtered';
 
+  const allLoadedSelected = rows.length > 0 && selectedIds.size === rows.length;
+  const toggleMaster = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === rows.length && rows.length > 0) return new Set();
+      return new Set(rows.map((r) => r.id));
+    });
+  }, [rows]);
+
+  const exportSelected = useCallback(() => {
+    const selected = rows.filter((r) => selectedIds.has(r.id));
+    if (selected.length === 0) return;
+    downloadRowsAsCsv(selected);
+  }, [rows, selectedIds]);
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
       <FeedFiltersPanel filters={filters} onChange={onChangeFilters} onClear={onClearFilters} />
 
-      <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card flex flex-col overflow-hidden">
-        {errorMessage && (
-          <Alert variant="destructive" role="alert" className="m-4">
-            <AlertDescription className="flex items-center gap-2">
-              <AlertTriangle className="size-3.5" aria-hidden />
-              {errorMessage}
-            </AlertDescription>
-          </Alert>
+      <div className="flex flex-col gap-3">
+        {selectedIds.size > 0 && (
+          <BulkActionsBar
+            selectedCount={selectedIds.size}
+            onExportCsv={exportSelected}
+            onClear={clearSelection}
+          />
         )}
 
-        <div
-          ref={scrollRef}
-          className="relative h-[calc(100vh-280px)] min-h-[400px] overflow-y-auto"
-        >
-          {showEmpty ? (
-            <EmptyState variant={emptyVariant} />
-          ) : (
-            <>
-              <div
-                style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
-                role="list"
-              >
-                {virtualizer.getVirtualItems().map((virtualRow) => {
-                  const row = rows[virtualRow.index];
-                  if (!row) return null;
-                  return (
-                    <TransactionRow
-                      key={row.id}
-                      row={row}
-                      top={virtualRow.start}
-                      height={ROW_HEIGHT_PX}
-                    />
-                  );
-                })}
-              </div>
-              {status === 'loading' && (
-                <div className="text-ifa-gray-500 flex items-center justify-center gap-2 py-4 text-xs">
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  {t('feed.loading')}
-                </div>
-              )}
-              {!hasMore && rows.length > 0 && (
-                <div className="text-ifa-gray-500 py-4 text-center text-xs">
-                  {t('feed.endOfList')}
-                </div>
-              )}
-            </>
+        <div className="bg-ifa-white rounded-ifa-card shadow-ifa-card flex flex-col overflow-hidden">
+          {errorMessage && (
+            <Alert variant="destructive" role="alert" className="m-4">
+              <AlertDescription className="flex items-center gap-2">
+                <AlertTriangle className="size-3.5" aria-hidden />
+                {errorMessage}
+              </AlertDescription>
+            </Alert>
           )}
+
+          {rows.length > 0 && (
+            <div className="border-ifa-gray-300 flex items-center gap-3 border-b px-4 py-2">
+              <Checkbox
+                checked={allLoadedSelected}
+                onCheckedChange={toggleMaster}
+                aria-label={t('bulk.selectAll')}
+              />
+              <span className="text-ifa-gray-500 text-xs tracking-wide uppercase">
+                {t('bulk.selectAll')}
+              </span>
+              {hasMore && (
+                <span className="text-ifa-gray-500 ml-auto text-xs">{t('bulk.loadedNote')}</span>
+              )}
+            </div>
+          )}
+
+          <div
+            ref={scrollRef}
+            className="relative h-[calc(100vh-280px)] min-h-[400px] overflow-y-auto"
+          >
+            {showEmpty ? (
+              <EmptyState variant={emptyVariant} />
+            ) : (
+              <>
+                <div
+                  style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
+                  role="list"
+                >
+                  {virtualizer.getVirtualItems().map((virtualRow) => {
+                    const row = rows[virtualRow.index];
+                    if (!row) return null;
+                    return (
+                      <TransactionRow
+                        key={row.id}
+                        row={row}
+                        top={virtualRow.start}
+                        height={ROW_HEIGHT_PX}
+                        selected={selectedIds.has(row.id)}
+                        onToggleSelected={toggleRow}
+                      />
+                    );
+                  })}
+                </div>
+                {status === 'loading' && (
+                  <div className="text-ifa-gray-500 flex items-center justify-center gap-2 py-4 text-xs">
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    {t('feed.loading')}
+                  </div>
+                )}
+                {!hasMore && rows.length > 0 && (
+                  <div className="text-ifa-gray-500 py-4 text-center text-xs">
+                    {t('feed.endOfList')}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function TransactionRow({ row, top, height }: { row: FeedRow; top: number; height: number }) {
+function TransactionRow({
+  row,
+  top,
+  height,
+  selected,
+  onToggleSelected,
+}: {
+  row: FeedRow;
+  top: number;
+  height: number;
+  selected: boolean;
+  onToggleSelected: (id: string) => void;
+}) {
   const t = useTranslations('transactions');
   const amountValue = Number(row.amount);
   return (
-    <Link
-      href={`/transacciones/${row.id}`}
+    <div
       role="listitem"
-      className="hover:bg-ifa-navy-50 focus-visible:bg-ifa-navy-50 border-ifa-gray-300 absolute right-0 left-0 grid grid-cols-[100px_minmax(0,1fr)_110px_140px_90px] items-center gap-3 border-b px-4 transition-colors outline-none"
+      className={`border-ifa-gray-300 absolute right-0 left-0 flex items-center gap-3 border-b pr-4 pl-4 transition-colors ${selected ? 'bg-ifa-navy-50' : 'hover:bg-ifa-navy-50'}`}
       style={{ top, height }}
     >
-      <span className="text-ifa-gray-700 text-xs tabular-nums">{row.date}</span>
-      <span className="text-ifa-navy-900 truncate text-sm">{row.description}</span>
-      <Money
-        amount={amountValue}
-        currency={row.currency}
-        className={amountValue < 0 ? 'text-ifa-gray-700' : 'text-ifa-teal-600'}
+      <Checkbox
+        checked={selected}
+        onCheckedChange={() => {
+          onToggleSelected(row.id);
+        }}
+        aria-label={t('bulk.selectRow')}
       />
-      <span className="text-ifa-gray-500 truncate text-xs">
-        {row.merchantName ?? row.merchantNit ?? '—'}
-      </span>
-      <span className="text-ifa-gray-500 truncate text-right text-xs tracking-wide uppercase">
-        {t(`sources.${row.source}`, { default: row.source })}
-      </span>
-    </Link>
+      <Link
+        href={`/transacciones/${row.id}`}
+        className="focus-visible:bg-ifa-navy-100 grid flex-1 grid-cols-[100px_minmax(0,1fr)_110px_140px_90px] items-center gap-3 rounded-sm outline-none"
+        style={{ height: height - 16 }}
+      >
+        <span className="text-ifa-gray-700 text-xs tabular-nums">{row.date}</span>
+        <span className="text-ifa-navy-900 truncate text-sm">{row.description}</span>
+        <Money
+          amount={amountValue}
+          currency={row.currency}
+          className={amountValue < 0 ? 'text-ifa-gray-700' : 'text-ifa-teal-600'}
+        />
+        <span className="text-ifa-gray-500 truncate text-xs">
+          {row.merchantName ?? row.merchantNit ?? '—'}
+        </span>
+        <span className="text-ifa-gray-500 truncate text-right text-xs tracking-wide uppercase">
+          {t(`sources.${row.source}`, { default: row.source })}
+        </span>
+      </Link>
+    </div>
   );
 }
 
