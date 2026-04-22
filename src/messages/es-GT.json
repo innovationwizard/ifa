@@ -40,6 +40,30 @@
       "phaseStatus": "Esta sección se construirá en una fase posterior del plan."
     }
   },
+  "reconciliationQueue": {
+    "title": "Por conciliar",
+    "subtitle": "Movimientos sin emparejar con su factura o TPV.",
+    "back": "Volver a movimientos",
+    "soon": {
+      "title": "Esto todavía no está automático",
+      "body": "Cuando conectes tu FEL y tus tarjetas, aquí podrás emparejar movimientos entre sí. Por ahora es solo una vista previa — el emparejamiento automático llega pronto."
+    },
+    "filterBySource": "Origen:",
+    "anySource": "Cualquier origen",
+    "sourceValues": {
+      "FEL": "Factura",
+      "TPV": "Tarjeta",
+      "BANK_CSV": "Banco",
+      "MANUAL": "Manual"
+    },
+    "rowCount": "{count, plural, =0 {0 pendientes} =1 {1 pendiente} other {# pendientes}}",
+    "loading": "Cargando...",
+    "loadError": "No pudimos cargar la lista. Intenta de nuevo en un minuto.",
+    "empty": {
+      "title": "Nada pendiente",
+      "body": "No hay movimientos sin emparejar. ¡Bien hecho!"
+    }
+  },
   "transactionDetail": {
     "back": "Volver a movimientos",
     "tabs": {
