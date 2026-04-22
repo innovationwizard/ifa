@@ -1,0 +1,7 @@
+The Holy Grail
+As it should be clearly explained in the genesis docs, connect to bank is THE HOLY GRAIL. 
+The reason why no app like this has ever existed in Guatemala is because no bank EVER has granted a rest api or any other kind of connection to... well, NOBODY. They are stubborn CLOSED to the idea. 
+This app is not a novel idea at all. Any decent country has one or multiple apps like this one, and they have had them for decades. 
+And: That's why I'm building the app NOW. A friend of mine, a former bank vp, is onboard with the idea and has verbally offered to do something in the spectrum of "testing the waters with one bank" to "pushing the envelope with a small group of banks" , depending on the traction that my app is able to gather. 
+So: If he, by miracle, gets a green light, this app MUST BE READY to connect to any given guatemalan bank IN NO TIME, before they think it twice. 
+Meanwhile, for the gaining traction period, the default flow is: (1) user downloads his bank statements from the bank website, in whichever format they come, and (2) user uploads to this app his bank statements in whichever format they were downloaded.

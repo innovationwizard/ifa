@@ -40,6 +40,17 @@
       "phaseStatus": "Esta sección se construirá en una fase posterior del plan."
     }
   },
+  "dashboard": {
+    "empty": {
+      "greeting": "¡Bienvenido, {name}!",
+      "lead": "Para ver tu puntaje y tus movimientos, sube un estado de cuenta de tu banco.",
+      "step1": "Entra al sitio web de tu banco y descarga tu estado de cuenta.",
+      "step2": "Súbelo aquí — acepta PDF, Excel o el archivo que te dé el banco.",
+      "step3": "Nosotros lo leemos, lo ordenamos, y te mostramos qué está pasando con tu plata.",
+      "cta": "Subir estado de cuenta",
+      "privacyNote": "Tu información es solo tuya. No la compartimos con tu banco ni con nadie."
+    }
+  },
   "modulePlaceholders": {
     "dashboard": "Panel principal con tu Puntaje de Salud Financiera, estado de conciliación, y acciones rápidas.",
     "transactions": "Feed unificado de transacciones FEL, TPV y bancarias con conciliación automática.",

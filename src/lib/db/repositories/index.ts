@@ -29,3 +29,6 @@ export type { ProfileRepo } from './profile';
 
 export { userRepo } from './user';
 export type { UserRepo } from './user';
+
+export { transactionRepo } from './transaction';
+export type { TransactionRepo } from './transaction';

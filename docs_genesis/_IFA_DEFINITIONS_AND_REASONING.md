@@ -78,6 +78,14 @@ Guatemalan SMEs operate in a paradox: they have modern infrastructure (FEL is ma
 
 IFA fills this gap: it is the connective tissue between FEL, bank card transactions, and accounting, adding an AI intelligence layer that transforms raw transaction data into business insights.
 
+#### 2.1.1 Why this product has never existed in Guatemala — and why we build now
+
+This concept is **not novel**. Every developed country has had one or more apps like this for decades — Credit Karma in the US, Mint, YNAB, Monzo's Plus, dozens in the EU. Guatemala does not, and the reason is singular: **no Guatemalan bank has ever granted a REST API (or SFTP, or any programmatic access) to any third-party app.** The banks are stubbornly closed to the idea. Without the ability to read a user's transactions, no consumer-finance intelligence product can exist. That wall is the entire blocker.
+
+**Why now, and not five years ago:** the founder has a verbal commitment from a former-bank-VP contact to help move that wall. Depending on the traction IFA shows, that help lives on a spectrum from "test the waters with one bank" to "push the envelope with a small group of banks." If any of those doors opens, the window will be short — banks that say yes once can reconsider. The app is therefore engineered from day one to ship a real bank-API integration **overnight** when the green light comes, with no schema migrations or data-model rework required (see `_IFA_SCAFFOLDING.md` §10.4 for the architecture of this readiness).
+
+**What runs in the meantime:** the **default ingestion pipeline is user-uploaded bank statements.** The user downloads statements from the bank's own portal in whatever format the bank exports (PDF, CSV, XLS, TXT, OFX, QIF — nothing consistent), uploads to IFA, and the parser normalizes. This is the primary flow during the traction-building phase, not a fallback. It stays in place indefinitely for any user whose bank has not (yet) opened an API.
+
 ### 2.2 Why Credit Karma as Benchmark
 
 Credit Karma solved a parallel problem in the US: credit data was opaque, scattered across bureaus, and inaccessible to consumers. Credit Karma made it free, continuous, and actionable.

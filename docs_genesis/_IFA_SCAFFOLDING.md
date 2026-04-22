@@ -19,7 +19,7 @@ drifts from this intent, the prompt wins.
 > the user, not the developer, of the features, functionalities, and benefits
 > of Credit Karma (Intuit's personal-finance product for consumers)."**
 
-**Two non-negotiable product truths (never assume away):**
+**Three non-negotiable product truths (never assume away):**
 
 1. **No credit bureau.** Consumer credit bureaus do not exist in Guatemala in
    any usable form. IFA does NOT pull from TransUnion GT, Infile, or anyone
@@ -36,6 +36,27 @@ drifts from this intent, the prompt wins.
    accounting-rules engine, IVA reporting, QuickBooks export). The business-
    case PDF is not aspirational "someday"; it is available from the MVP, but
    never the default.
+3. **Bank connection is the Holy Grail — and the app is engineered for
+   overnight integration readiness.** No Guatemalan bank has ever granted a
+   REST API (or SFTP, or any programmatic access) to any third-party app.
+   This is the exact reason no Credit-Karma-style app has existed in
+   Guatemala — a concept that has been mundane in every developed country
+   for decades. IFA is being built **now** because a friend of the founder
+   (a former bank VP) is verbally onboard and may "test the waters with one
+   bank" to "push the envelope with a small group of banks," proportional
+   to the traction IFA can show. If any of those doors opens, the window
+   will be short — banks that say yes once can reconsider. The ingestion
+   layer must therefore be able to ship a real bank-API integration
+   **overnight**, with no schema migrations, no data-model rework, and no
+   feature-flag scaffolding to retrofit (see §10.4 — Bank Statement
+   Ingestion + Bank-API Readiness). Until that door opens, the **default
+   flow** for every INDIVIDUAL user is: (a) download statements from the
+   bank's own website in whatever format the bank hands over (PDF, CSV,
+   XLS, TXT, OFX, QIF — assume nothing consistent), and (b) upload them to
+   IFA. This is the default pipeline, not a fallback. Never propose Plaid /
+   Teller / Tink / any US/EU aggregator as a shortcut — none cover
+   Guatemala. Never propose scraping a bank's consumer portal — legal and
+   fragility risks make it a non-starter.
 
 **Additional implications reaffirmed on 2026-04-21:**
 
@@ -725,19 +746,104 @@ Permanent achievements displayed in user profile and achievements hub.
 | Mapping   | IFA chart of accounts → QB chart of accounts (user-configurable mapping table) |
 | Frequency | On-demand or scheduled (daily/weekly)                                          |
 
-### 10.4 Integration Adapter Pattern
+### 10.4 Bank Statement Ingestion + Bank-API Readiness — The Holy Grail
+
+This is the **load-bearing integration story** for the INDIVIDUAL tier
+and the single largest strategic asset of the product. The genesis
+prompt (truth #3) explains the why; this section defines the how.
+
+#### 10.4.1 Phase A — Traction-building (default for MVP)
+
+The bank-statement upload pipeline is the **primary ingestion path**,
+not a fallback. Every INDIVIDUAL user lives on it until bank APIs open.
+
+| Aspect             | Specification                                                                                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trigger            | User downloads statements from the bank's own web/mobile portal, uploads the file(s) to IFA                                                                                               |
+| Accepted formats   | PDF (tabular + scanned), CSV, XLS/XLSX, TXT (fixed-width + delimited), OFX, QIF — assume nothing consistent across banks or even across statements from the same bank in different months |
+| Parser strategy    | Per-format parsers with LLM-assisted format detection for PDF / unknown-shape CSVs; column-mapping wizard for user-assisted resolution when auto-detect is low-confidence                 |
+| Storage            | Raw uploaded file retained in Supabase Storage (`bank-statements/{profileId}/{uploadId}/<file>`), hash-indexed to prevent double-ingestion of the same file                               |
+| Normalization      | All parsed rows land as `Transaction` with `source = BANK_CSV` (schema value reused — covers CSV and every other file format; renaming is a future cleanup, not a blocker)                |
+| Deduplication      | `(profileId, source, externalId)` unique constraint; `externalId` derived from the bank-assigned reference if present, otherwise a hash of (date, amount, description, running-balance)   |
+| Error recovery     | Parse failures routed to a per-profile "needs your eyes" queue; user reviews / tags columns; the mapping is saved per-bank so subsequent uploads from the same bank skip the wizard       |
+| OCR fallback       | Scanned-PDF statements (common for older bank exports) go through OCR before parsing; confidence scores surface in the UI                                                                 |
+| Copy & positioning | NEVER call this a "fallback" or imply it's temporary in user-facing copy. It is the current normal. Do NOT commit to a date for "direct bank connection" in UI                            |
+
+#### 10.4.2 Phase B — Bank-API Readiness (when a door opens)
+
+When the founder's former-bank-VP contact green-lights a pilot with a
+specific Guatemalan bank, the integration must ship **in days, not
+weeks**. The following architectural constraints exist **now** to make
+that possible without rework:
+
+1. **No schema migration needed.** The `TransactionSource` enum already
+   reserves `BANK_CSV`. A new `BANK_API` value is an additive enum
+   change only (Postgres enums are append-safe), and even that can be
+   skipped at first by routing API-pulled rows into `BANK_CSV` with a
+   flag in the canonical `metadata` JSONB field. No table add, no
+   column add, no index change.
+2. **No data-model rework needed.** The `Integration` model already
+   carries the encrypted `credentials` blob, the polling cadence in
+   `config`, and the `status` lifecycle. A bank-API integration
+   instantiates a new `IntegrationProvider` enum value
+   (e.g. `BAC_PERSONAL_API`, `BANCO_INDUSTRIAL_PERSONAL_API`); that is
+   the extent of schema change.
+3. **Adapter parity with existing integrations.** The bank-API adapter
+   implements the same `DataSourceAdapter` interface documented in
+   §10.5. No new integration pattern is introduced. Existing polling,
+   retry, dead-letter, and audit scaffolding applies verbatim.
+4. **Credentials flexibility.** The encrypted credentials store is
+   already shape-agnostic (JSONB ciphertext). It must continue to
+   accept any shape a bank hands us: API key + secret, OAuth2 client
+   credentials, mTLS certs, short-lived JWT, SFTP user/pass/key, or
+   whatever the bank's own security team insists on.
+5. **Server-side per-profile feature flag.** The first bank pilot runs
+   as an opt-in behind a server-side flag toggled per Profile (via the
+   `Integration.status = CONNECTED` row plus a
+   `Profile.earlyBankApiPilot` boolean added only when the first
+   pilot actually lands). No pre-rollout gating work is needed —
+   Integration already covers it.
+6. **No UI re-architecture.** The `/configuracion/integraciones` page
+   (§6.3) lists all integrations uniformly. A new bank-API provider
+   appears as a new card on that page when enabled for the Profile.
+   No separate "direct bank connection" flow needs to be designed in
+   advance.
+
+#### 10.4.3 What NOT to do
+
+- **Don't route around the problem with US/EU aggregators.** Plaid,
+  Teller, Tink, Yodlee — none cover Guatemala. Proposing them is a
+  non-starter.
+- **Don't scrape bank consumer portals.** Legal exposure (TOS
+  violation, Ley de Bancos implications) and engineering fragility
+  (every portal redesign breaks the scraper) make this off-limits.
+- **Don't treat SIB (Superintendencia de Bancos) as a data source.**
+  They are a regulator, not a feed.
+- **Don't promise "direct bank connection — coming soon" in copy.**
+  The schedule is "whenever a bank says yes." Anything more specific
+  creates false expectations both externally (users) and internally
+  (engineers thinking the pipeline is optional).
+
+### 10.5 Integration Adapter Pattern
 
 Each external system gets a dedicated adapter implementing a common interface:
 
 ```typescript
 interface DataSourceAdapter {
-  readonly sourceType: 'FEL' | 'TPV' | 'BANK_CSV' | 'QUICKBOOKS';
+  readonly sourceType: 'FEL' | 'TPV' | 'BANK_CSV' | 'BANK_API' | 'QUICKBOOKS';
   connect(credentials: EncryptedCredentials): Promise<ConnectionResult>;
   pull(since: Date): Promise<RawTransaction[]>;
   normalize(raw: RawTransaction[]): CanonicalTransaction[];
   healthCheck(): Promise<HealthStatus>;
 }
 ```
+
+`BANK_API` is listed above as a **reserved sourceType for the Phase B
+readiness case** described in §10.4.2. At runtime today it is unused;
+the bank-statement upload pipeline runs under `BANK_CSV`. When the
+first bank integration ships, the adapter selects `BANK_API` and the
+enum gains an additive value at the DB level (no migration beyond
+`ALTER TYPE "TransactionSource" ADD VALUE 'BANK_API';`).
 
 ---
 
