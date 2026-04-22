@@ -49,6 +49,29 @@ export interface TransactionListResult {
   hasMore: boolean;
 }
 
+/**
+ * Include shape used by `transactionRepo.findDetailById`. Exported so
+ * callers (route handlers, UI components) can spell the return type.
+ */
+export const TRANSACTION_DETAIL_INCLUDE = {
+  felData: true,
+  tpvData: true,
+  felReconciliation: {
+    include: {
+      tpvTransaction: { include: { tpvData: true } },
+    },
+  },
+  tpvReconciliation: {
+    include: {
+      felTransaction: { include: { felData: true } },
+    },
+  },
+} as const satisfies Prisma.TransactionInclude;
+
+export type TransactionDetail = Prisma.TransactionGetPayload<{
+  include: typeof TRANSACTION_DETAIL_INCLUDE;
+}>;
+
 export const transactionRepo = {
   count(args: Prisma.TransactionCountArgs = {}): Promise<number> {
     return prisma.transaction.count(args);
@@ -56,6 +79,61 @@ export const transactionRepo = {
 
   findFirst(args: Prisma.TransactionFindFirstArgs): Promise<Transaction | null> {
     return prisma.transaction.findFirst(args);
+  },
+
+  /**
+   * Fetch a single transaction by id, with FEL/TPV sidecars and both
+   * reconciliation sides (including the matched counterparty's own
+   * sidecar) eagerly loaded.
+   *
+   * Returns `null` when either the row does not exist OR it belongs to
+   * a different tenant — the tenancy extension injects
+   * `where: { profileId }` automatically, so a foreign-tenant id and
+   * a non-existent id produce the same null result. Routes should map
+   * both cases to 404 without attempting to distinguish (no
+   * enumeration).
+   */
+  findDetailById(id: string): Promise<TransactionDetail | null> {
+    return prisma.transaction.findFirst({
+      where: { id },
+      include: TRANSACTION_DETAIL_INCLUDE,
+    });
+  },
+
+  /**
+   * Journal entries whose lines reference the given transaction. Goes
+   * through `JournalEntry` (tenant-scoped) — the tenancy extension
+   * applies the `profileId` filter automatically, so cross-tenant
+   * leakage isn't possible even if `transactionId` collided across
+   * tenants (which it can't under UUIDv7 anyway).
+   */
+  listRelatedJournalEntries(transactionId: string) {
+    return prisma.journalEntry.findMany({
+      where: { lines: { some: { transactionId } } },
+      include: {
+        lines: {
+          where: { transactionId },
+          include: {
+            account: { select: { id: true, code: true, name: true, type: true } },
+          },
+        },
+      },
+      orderBy: { date: 'desc' },
+    });
+  },
+
+  /**
+   * Audit trail for a single transaction. `TransactionAudit` has no
+   * `profileId` column and is therefore NOT in TENANT_SCOPED_MODELS —
+   * it relies on the upstream Transaction fetch being tenant-verified
+   * before this method is called. Callers MUST call `findDetailById`
+   * first and only proceed to this method on a non-null result.
+   */
+  listAuditById(transactionId: string) {
+    return prisma.transactionAudit.findMany({
+      where: { transactionId },
+      orderBy: { createdAt: 'desc' },
+    });
   },
 
   /**
