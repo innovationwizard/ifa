@@ -19,7 +19,7 @@ export default async function TerminosPage() {
   const t = await getTranslations('legal.terms');
   return (
     <main className="bg-ifa-navy-50 min-h-dvh px-4 py-10">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -29,6 +29,15 @@ export default async function TerminosPage() {
             <CardDescription>{t('placeholder')}</CardDescription>
           </CardHeader>
           <CardContent />
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('priceChangeTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-ifa-gray-700 text-sm leading-relaxed">{t('priceChangeBody')}</p>
+          </CardContent>
         </Card>
       </div>
     </main>

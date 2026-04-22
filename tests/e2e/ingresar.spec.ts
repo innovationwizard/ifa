@@ -37,9 +37,12 @@ test.describe('/ingresar — magic-link + Google OAuth sign-in', () => {
     });
 
     await page.goto('/ingresar');
-    await page
-      .getByLabel(/Tu correo/i)
-      .pressSequentially('first-time-user-at-example.test'.replace('-at-', '@'));
+    const emailInput = page.getByLabel(/Tu correo/i);
+    // Clicking first forces the React hydration handshake — on chromium we
+    // occasionally typed into the input before RHF had attached its
+    // onChange listener, and the form stayed empty on submit.
+    await emailInput.click();
+    await emailInput.pressSequentially('first-time-user-at-example.test'.replace('-at-', '@'));
     await page.getByRole('button', { name: /Mándame el enlace/i }).click();
     // Wait for navigation to the check-inbox page.
     await page.waitForURL(/\/ingresar\/revisa-tu-correo/, { timeout: 10_000 });
@@ -64,7 +67,9 @@ test.describe('/ingresar — magic-link + Google OAuth sign-in', () => {
     page,
   }) => {
     await page.goto('/ingresar');
-    await page.getByLabel(/Tu correo/i).pressSequentially('not-an-email');
+    const emailInput = page.getByLabel(/Tu correo/i);
+    await emailInput.click();
+    await emailInput.pressSequentially('not-an-email');
     await page.getByRole('button', { name: /Mándame el enlace/i }).click();
     // No navigation — we're still on /ingresar.
     await expect(page).toHaveURL(/\/ingresar$/);

@@ -72,13 +72,30 @@ enum IndustryType {
   OTHER
 }
 
-/// Subscription tier per scaffolding §8.1. Billing is deferred per locked F
-/// but the column exists so pricing logic can key off it later without a
-/// migration.
-enum SubscriptionTier {
-  STARTER
-  PROFESSIONAL
-  ENTERPRISE
+/// Subscription lifecycle state for a Profile's billing relationship.
+///
+///   - TRIAL            new profile, in 30-day free-trial window; has access
+///   - ACTIVE           paying customer; Stripe subscription is `active`
+///   - PAST_DUE         payment failed OR trial ended without payment; soft
+///                      gate — user sees nagging UI but retains full access
+///                      for the 30-day soft-gate window
+///   - CANCELED         user canceled via portal; retains access until
+///                      `currentPeriodEnd`, then transitions to EXPIRED
+///   - EXPIRED          terminal no-access state; hard gate blocks routes
+///   - EARLY_SUPPORTER  VIP flag — locked at USD $1/mo forever regardless of
+///                      future price changes, applies to both INDIVIDUAL and
+///                      BUSINESS tiers; always has access
+///
+/// The pricing-tier (USD $1 personal vs USD $20 business) is keyed off
+/// `Profile.type` (INDIVIDUAL / BUSINESS), not off this enum. EARLY_SUPPORTER
+/// overrides the tier's price but not its feature set.
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+  EARLY_SUPPORTER
 }
 
 /// The tenant boundary. Every tenant-scoped table carries a `profileId`
@@ -128,18 +145,44 @@ model Profile {
   // --- Defaults -------------------------------------------------------
   /// ISO 4217 currency code. GTQ default; USD-parallel accounts can still
   /// hold USD-denominated transactions via per-transaction currency fields.
-  currency            String           @default("GTQ")
+  currency            String   @default("GTQ")
   /// IANA timezone. Guatemala has no DST per scaffolding §12.4.
-  timezone            String           @default("America/Guatemala")
-  subscriptionTier    SubscriptionTier @default(STARTER)
-  onboardingCompleted Boolean          @default(false)
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  timezone            String   @default("America/Guatemala")
+  onboardingCompleted Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // --- Billing / Stripe -----------------------------------------------
+  /// Stripe Customer id (`cus_*`). Lazily populated on first Stripe
+  /// interaction (checkout session creation or portal link). Null during
+  /// trial if the user hasn't touched Stripe yet.
+  stripeCustomerId     String?            @unique
+  /// Active Stripe Subscription id (`sub_*`). Null for TRIAL / EXPIRED /
+  /// EARLY_SUPPORTER states. On subscription cancellation we keep the
+  /// id until `currentPeriodEnd` for portal access.
+  stripeSubscriptionId String?            @unique
+  subscriptionStatus   SubscriptionStatus @default(TRIAL)
+  /// When the initial free trial ends. Set to `createdAt + 30d` at
+  /// profile creation. After this date the paywall gate transitions the
+  /// profile into PAST_DUE (soft gate) until a successful checkout.
+  trialEndsAt          DateTime?
+  /// End of the current Stripe billing period. Drives the soft/hard-gate
+  /// logic for CANCELED subscriptions (access until this date, then
+  /// EXPIRED). Null for TRIAL and EARLY_SUPPORTER.
+  currentPeriodEnd     DateTime?
+  /// Timestamp flag — when non-null, this profile is a VIP early
+  /// supporter locked at USD $1/mo forever. Orthogonal to
+  /// `subscriptionStatus`; always grants access regardless of billing
+  /// state. Set manually (admin action) or via the EARLY_SUPPORTER
+  /// promo code on first checkout during the early-adopter window.
+  earlySupporterSince  DateTime?
 
   members ProfileMember[]
 
   @@index([type])
   @@index([nit])
+  @@index([subscriptionStatus])
+  @@index([trialEndsAt])
   @@map("profiles")
 }
 

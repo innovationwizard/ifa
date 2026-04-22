@@ -91,3 +91,41 @@ export function getServerEnv(): {
     anthropicApiKey: requireServerEnv('ANTHROPIC_API_KEY', process.env.ANTHROPIC_API_KEY),
   };
 }
+
+/**
+ * Stripe server env vars — OPTIONAL by design. Returns `null` when the
+ * secret key is not configured so the app runs in a trial-only,
+ * Stripe-disabled mode during early development. Checkout/portal/webhook
+ * handlers short-circuit gracefully when this is null.
+ *
+ * Required for billing:
+ *   - STRIPE_SECRET_KEY              `sk_test_*` / `sk_live_*`
+ *   - STRIPE_WEBHOOK_SECRET          `whsec_*` (signing secret for /webhook)
+ *   - STRIPE_PRICE_INDIVIDUAL_ID     Price id for the $1/mo personal plan
+ *   - STRIPE_PRICE_BUSINESS_ID       Price id for the $20/mo business plan
+ *
+ * When partially configured (secret key set but price ids missing), the
+ * checkout route errors with a clear message so misconfiguration surfaces
+ * loudly instead of silently falling back to trial-only mode.
+ */
+export function getStripeEnv(): {
+  secretKey: string;
+  webhookSecret: string | null;
+  priceIndividualId: string | null;
+  priceBusinessId: string | null;
+} | null {
+  if (typeof window !== 'undefined') {
+    throw new Error(
+      'getStripeEnv() called from a client bundle. Split the import so only ' +
+        'server code touches Stripe secrets.',
+    );
+  }
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) return null;
+  return {
+    secretKey,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? null,
+    priceIndividualId: process.env.STRIPE_PRICE_INDIVIDUAL_ID ?? null,
+    priceBusinessId: process.env.STRIPE_PRICE_BUSINESS_ID ?? null,
+  };
+}

@@ -121,11 +121,63 @@
   "legal": {
     "terms": {
       "title": "Términos de uso",
-      "placeholder": "Esta sección está en revisión legal. Cuando esté lista, aquí verás los términos completos."
+      "placeholder": "Esta sección está en revisión legal. Cuando esté lista, aquí verás los términos completos.",
+      "priceChangeTitle": "Precios",
+      "priceChangeBody": "Los precios de IFA pueden cambiar en cualquier momento, sin aviso previo. Si ya estás suscrito, el cambio aplicará en tu siguiente ciclo de pago. Avísanos si tienes dudas escribiendo a ayuda@ifa.gt."
     },
     "privacy": {
       "title": "Aviso de privacidad",
       "placeholder": "Esta sección está en revisión legal. Cuando esté lista, aquí verás cómo cuidamos tu información."
+    }
+  },
+  "billing": {
+    "pricing": {
+      "title": "Precios de IFA",
+      "subtitle": "Un mes gratis para que pruebes sin compromiso. Después eliges el plan que te sirva.",
+      "perMonth": "al mes",
+      "usd": "USD",
+      "priceFormat": "${amount}",
+      "trialBadge": "1 mes gratis, sin tarjeta",
+      "priceChangeNotice": "Los precios pueden cambiar en cualquier momento, sin aviso previo.",
+      "termsLinkLabel": "Términos",
+      "ctaStart": "Empieza gratis",
+      "ctaUpgrade": "Pasar a este plan",
+      "ctaBusy": "Cargando...",
+      "ctaNotReady": "Pronto",
+      "notReadyMessage": "Todavía no tenemos los pagos activados. Sigue usando la app — te avisaremos cuando esté listo."
+    },
+    "plans": {
+      "individual": {
+        "name": "Personal",
+        "tagline": "Para ti y tus finanzas del día a día.",
+        "features": {
+          "one": "Tu puntaje de salud financiera, actualizado cada noche.",
+          "two": "Conecta tus cuentas de banco y tarjetas.",
+          "three": "Alertas cuando algo no cuadra.",
+          "four": "Todo en español claro, sin tecnicismos."
+        }
+      },
+      "business": {
+        "name": "Empresa",
+        "tagline": "Para tu negocio o emprendimiento.",
+        "features": {
+          "one": "Todo lo del plan Personal.",
+          "two": "Contabilidad automática: asientos, libros, estados.",
+          "three": "Facturas FEL, terminales de tarjeta (TPV), NIT.",
+          "four": "Invita a tu contador o socio al equipo."
+        }
+      }
+    },
+    "gate": {
+      "trialEndsIn": "Te quedan {days} días gratis.",
+      "trialLastDay": "Hoy es tu último día gratis.",
+      "softGateTitle": "Tu prueba terminó",
+      "softGateBody": "Puedes seguir usando IFA por {days} días más. Después, vas a necesitar un plan.",
+      "softGateCta": "Ver planes",
+      "hardGateTitle": "Necesitas un plan para seguir",
+      "hardGateBody": "Tu periodo de prueba terminó. Elige un plan para seguir usando IFA.",
+      "hardGateCta": "Ver planes",
+      "earlySupporterBadge": "Eres Early Supporter"
     }
   },
   "errors": {
