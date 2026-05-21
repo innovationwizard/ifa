@@ -258,7 +258,7 @@ No business logic yet.
       exponential backoff (3 attempts, 200ms / 800ms / 3200ms)
 - [ ] Cost telemetry: every call emits a single `console.log` line
       with `{model, inputTokens, outputTokens, cacheReadTokens,
-    cacheWriteTokens, latencyMs}` (structured logging; replace
+cacheWriteTokens, latencyMs}` (structured logging; replace
       with proper observer in a later story)
 - [ ] Unit tests: retry on 500 then succeed, fail after 3 attempts,
       `getClaudeClient` is the same instance across calls
@@ -785,7 +785,7 @@ $CRON_SECRET`; no other code changes needed.
 - [ ] Each profile's recompute respects the 1× / hour throttle
       from Batch 11 (cron bypasses it via a `force: true` flag)
 - [ ] Summary returned: `{ totalProfiles, succeeded, failed,
-    durationMs }`
+durationMs }`
 - [ ] Vercel cron config registers the schedule
 - [ ] Full gate sweep green
 
@@ -826,7 +826,7 @@ that closes a batch MUST include this file's updated progress log so
 state is recoverable from `git log -p docs/_PHASE_6_7_PLAN.md`.
 
 - [x] Batch 1 — Schema additions · 5/5 in batch · 5/100 overall · commit `<pending>` · 2026-04-22 - schema validated (`pnpm db:format`) - `db:push --accept-data-loss` applied to Supabase prod, diff was purely additive (3 enums + 2 tables + 4 indexes; no DROP, no ALTER COLUMN) - `db:generate` refreshed client - `MerchantCategory` added to `TENANT_SCOPED_MODELS` in `src/lib/db/tenancy.ts` - smoke count: `{ merchantCategories: 0, pendingJobs: 0 }` — tables reachable - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 242/242 ✓ playwright 60/60 ✓ next build ✓
-- [ ] Batch 2 — Anthropic client wrapper · 0/6 in batch · 0/100 overall
+- [x] Batch 2 — Anthropic client wrapper · 6/6 in batch · 11/100 overall · commit `<pending>` · 2026-05-21 - `@anthropic-ai/sdk@0.97.1` installed - `src/lib/ai/claude.ts` exports `MODEL_OPUS='claude-opus-4-7'`, `MODEL_HAIKU='claude-haiku-4-5-20251001'`, singleton `getClaudeClient()` (lazy env read, `maxRetries: 0` so our loop owns retries), `callClaudeWithRetry()` with 3-retry exponential backoff (200/800/3200 ms) on 5xx + 429, structured cost telemetry that emits only `{event, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, latencyMs}` — never prompt/response content - `_resetClaudeClientForTesting()` test seam - `src/lib/ai/claude.test.ts` covers 10 paths: model constants, first-attempt success, telemetry shape + privacy invariant (no `ping`/`"ok"` in log line), cache-counter defaults, 500→retry, 429→retry, exhaust 3 retries→rethrow APIError, no-retry on 400, no-retry on non-APIError, singleton identity - vitest mock of `@/lib/env` for module-load env throw; `@vitest-environment node` directive for SDK's browser guard - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 252/252 ✓ playwright 60/60 ✓ next build ✓
 - [ ] Batch 3 — AI categorization service · 0/7 in batch · 0/100 overall
 - [ ] Batch 4 — Job queue infrastructure · 0/7 in batch · 0/100 overall
 - [ ] Batch 5 — Auto-trigger + backfill · 0/6 in batch · 0/100 overall
