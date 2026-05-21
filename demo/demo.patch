@@ -1,0 +1,852 @@
+diff --git a/package.json b/package.json
+index 584bf6e..014a798 100644
+--- a/package.json
++++ b/package.json
+@@ -70,6 +70,7 @@
+     "react": "^19.2.5",
+     "react-dom": "^19.2.5",
+     "react-hook-form": "^7.73.1",
++    "recharts": "^3.8.1",
+     "shadcn": "^4.3.1",
+     "sonner": "^2.0.7",
+     "stripe": "^22.0.2",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 6c70e6c..bcc31e3 100644
+Binary files a/pnpm-lock.yaml and b/pnpm-lock.yaml differ
+diff --git a/src/app/(app)/contabilidad/page.tsx b/src/app/(app)/contabilidad/page.tsx
+index 8353fac..e2be1d0 100644
+--- a/src/app/(app)/contabilidad/page.tsx
++++ b/src/app/(app)/contabilidad/page.tsx
+@@ -1,7 +1,152 @@
+-import { ModulePlaceholder } from '@/components/shell/module-placeholder';
++import { redirect } from 'next/navigation';
++import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
++import { loadFinancialOverviewData } from '@/components/demo/load-overview-data';
++import { getCurrentUser } from '@/lib/auth/server';
++import { profileRepo } from '@/lib/db/repositories';
++
++function fmtQ(amount: number): string {
++  return `Q ${amount.toLocaleString('es-GT', { maximumFractionDigits: 2 })}`;
++}
++
++export default async function ContabilidadPage() {
++  const user = await getCurrentUser();
++  if (!user) redirect('/ingresar');
++
++  const profiles = await profileRepo.findManyForUser(user.id);
++  const profile = profiles[0];
++  if (!profile) redirect('/bienvenida');
++
++  const data = await loadFinancialOverviewData(profile.id);
++  const netResult = data.totalIncome - data.totalExpense;
++  const monthsCount = data.monthly.length || 1;
++  const avgIncome = data.totalIncome / monthsCount;
++  const avgExpense = data.totalExpense / monthsCount;
+ 
+-export default function ContabilidadPage() {
+   return (
+-    <ModulePlaceholder titleKey="nav.accounting" descriptionKey="modulePlaceholders.accounting" />
++    <div className="flex flex-col gap-6">
++      <header className="flex flex-col gap-1">
++        <h1 className="text-ifa-navy-900 text-2xl font-semibold tracking-tight">Contabilidad</h1>
++        <p className="text-ifa-gray-700 text-sm">
++          Estado de resultados personal — últimos 3 meses
++        </p>
++      </header>
++
++      <div className="grid gap-6 lg:grid-cols-3">
++        <Card className="lg:col-span-2">
++          <CardHeader>
++            <CardTitle>Estado de resultados</CardTitle>
++            <CardDescription>Resumen estilo P&L para uso personal</CardDescription>
++          </CardHeader>
++          <CardContent>
++            <table className="w-full text-sm">
++              <tbody>
++                <tr className="border-b border-gray-200">
++                  <td className="text-ifa-navy-900 py-3 font-semibold uppercase tracking-wide text-xs">
++                    Ingresos del periodo
++                  </td>
++                  <td className="text-ifa-teal-600 py-3 text-right font-bold tabular-nums">
++                    {fmtQ(data.totalIncome)}
++                  </td>
++                </tr>
++                <tr className="border-b border-gray-100">
++                  <td className="text-ifa-gray-700 py-2 pl-6">Promedio mensual</td>
++                  <td className="text-ifa-gray-700 py-2 text-right tabular-nums">
++                    {fmtQ(avgIncome)}
++                  </td>
++                </tr>
++
++                <tr className="border-b border-gray-200">
++                  <td className="text-ifa-navy-900 py-3 font-semibold uppercase tracking-wide text-xs">
++                    Gastos del periodo
++                  </td>
++                  <td className="py-3 text-right font-bold tabular-nums text-red-600">
++                    ({fmtQ(data.totalExpense)})
++                  </td>
++                </tr>
++                {data.categories.map((c) => (
++                  <tr key={c.category} className="border-b border-gray-100">
++                    <td className="text-ifa-gray-700 py-2 pl-6">{c.category}</td>
++                    <td className="text-ifa-gray-700 py-2 text-right tabular-nums">
++                      ({fmtQ(c.amount)})
++                    </td>
++                  </tr>
++                ))}
++                <tr className="border-b border-gray-100">
++                  <td className="text-ifa-gray-700 py-2 pl-6">Promedio mensual</td>
++                  <td className="text-ifa-gray-700 py-2 text-right tabular-nums">
++                    ({fmtQ(avgExpense)})
++                  </td>
++                </tr>
++
++                <tr className="border-t-2 border-gray-300">
++                  <td className="text-ifa-navy-900 py-4 text-base font-bold uppercase tracking-wide">
++                    Resultado neto
++                  </td>
++                  <td
++                    className={`py-4 text-right text-lg font-bold tabular-nums ${netResult >= 0 ? 'text-ifa-teal-600' : 'text-red-600'}`}
++                  >
++                    {fmtQ(netResult)}
++                  </td>
++                </tr>
++                <tr>
++                  <td className="text-ifa-gray-700 py-2 italic">Margen de ahorro</td>
++                  <td
++                    className={`py-2 text-right tabular-nums ${data.savingsRate >= 10 ? 'text-ifa-teal-600' : data.savingsRate >= 0 ? 'text-yellow-600' : 'text-red-600'}`}
++                  >
++                    {data.savingsRate.toFixed(2)}%
++                  </td>
++                </tr>
++              </tbody>
++            </table>
++          </CardContent>
++        </Card>
++
++        <div className="flex flex-col gap-4">
++          <Card>
++            <CardHeader>
++              <CardTitle className="text-base">Movimientos registrados</CardTitle>
++            </CardHeader>
++            <CardContent>
++              <p className="text-ifa-navy-900 text-3xl font-bold tabular-nums">{data.txCount}</p>
++              <p className="text-ifa-gray-700 mt-1 text-xs">en los últimos 3 meses</p>
++            </CardContent>
++          </Card>
++
++          <Card>
++            <CardHeader>
++              <CardTitle className="text-base">Pagos recurrentes</CardTitle>
++            </CardHeader>
++            <CardContent>
++              <p className="text-ifa-navy-900 text-3xl font-bold tabular-nums">
++                {data.recurringCount}
++              </p>
++              <p className="text-ifa-gray-700 mt-1 text-xs">
++                comercios con 3+ visitas en el periodo
++              </p>
++            </CardContent>
++          </Card>
++
++          <Card>
++            <CardHeader>
++              <CardTitle className="text-base">Mayor gasto único</CardTitle>
++            </CardHeader>
++            <CardContent>
++              {data.largestExpense ? (
++                <>
++                  <p className="text-ifa-navy-900 text-2xl font-bold tabular-nums">
++                    {fmtQ(data.largestExpense.amount)}
++                  </p>
++                  <p className="text-ifa-gray-700 mt-1 text-xs">
++                    {data.largestExpense.merchantName ?? data.largestExpense.description}
++                  </p>
++                </>
++              ) : (
++                <p className="text-ifa-gray-700 text-sm">Sin datos</p>
++              )}
++            </CardContent>
++          </Card>
++        </div>
++      </div>
++    </div>
+   );
+ }
+diff --git a/src/app/(app)/dashboard/page.tsx b/src/app/(app)/dashboard/page.tsx
+index 1494226..e5220d1 100644
+--- a/src/app/(app)/dashboard/page.tsx
++++ b/src/app/(app)/dashboard/page.tsx
+@@ -1,28 +1,11 @@
+ import { redirect } from 'next/navigation';
+ import { EmptyDashboard } from '@/components/dashboard/empty-state';
+-import { ModulePlaceholder } from '@/components/shell/module-placeholder';
++import { FinancialOverview } from '@/components/demo/financial-overview';
++import { loadFinancialOverviewData } from '@/components/demo/load-overview-data';
+ import { getCurrentUser } from '@/lib/auth/server';
+-import { profileRepo, transactionRepo } from '@/lib/db/repositories';
+-import { withTenant } from '@/lib/db/tenant-context';
++import { profileRepo } from '@/lib/db/repositories';
++import { prismaUnscoped } from '@/lib/db/prisma';
+ 
+-/**
+- * Dashboard.
+- *
+- * Zero-transaction branch renders the empty state (S-2.9), which
+- * leads the user to upload their first bank statement per the
+- * Phase-A ingestion pipeline (scaffolding §10.4.1).
+- *
+- * Non-zero branch currently falls through to the module placeholder
+- * — the real widgets (Financial Health Score gauge, recent activity,
+- * insights feed) land in later stories. Until then, having any
+- * transactions simply means "past the onboarding cliff"; the content
+- * isn't the point of this story.
+- *
+- * Note: (app)/layout already looked up user + profile, but passing
+- * them through to nested pages would require context plumbing. A
+- * re-fetch here is one cheap query; revisit with React cache() when
+- * more (app) pages start repeating this pattern.
+- */
+ export default async function DashboardPage() {
+   const user = await getCurrentUser();
+   if (!user) redirect('/ingresar');
+@@ -31,16 +14,29 @@ export default async function DashboardPage() {
+   const profile = profiles[0];
+   if (!profile) redirect('/bienvenida');
+ 
+-  const transactionCount = await withTenant({ profileId: profile.id, userId: user.id }, () =>
+-    transactionRepo.count(),
+-  );
++  const transactionCount = await prismaUnscoped.transaction.count({
++    where: { profileId: profile.id },
++  });
+ 
+   if (transactionCount === 0) {
+     const firstName = profile.displayName.split(/\s+/)[0] ?? profile.displayName;
+     return <EmptyDashboard firstName={firstName} />;
+   }
+ 
++  const data = await loadFinancialOverviewData(profile.id);
++  const firstName = profile.displayName.split(/\s+/)[0] ?? profile.displayName;
++
+   return (
+-    <ModulePlaceholder titleKey="nav.dashboard" descriptionKey="modulePlaceholders.dashboard" />
++    <div className="flex flex-col gap-6">
++      <header className="flex flex-col gap-1">
++        <h1 className="text-ifa-navy-900 text-2xl font-semibold tracking-tight">
++          Hola, {firstName}
++        </h1>
++        <p className="text-ifa-gray-700 text-sm">
++          Tu resumen financiero de los últimos 3 meses
++        </p>
++      </header>
++      <FinancialOverview data={data} />
++    </div>
+   );
+ }
+diff --git a/src/app/(app)/inteligencia/page.tsx b/src/app/(app)/inteligencia/page.tsx
+index 8cbfb3f..d960a18 100644
+--- a/src/app/(app)/inteligencia/page.tsx
++++ b/src/app/(app)/inteligencia/page.tsx
+@@ -1,10 +1,106 @@
+-import { ModulePlaceholder } from '@/components/shell/module-placeholder';
++import { redirect } from 'next/navigation';
++import { Lightbulb, TrendingDown, TrendingUp, Target, AlertTriangle } from 'lucide-react';
++import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
++import { FinancialOverview } from '@/components/demo/financial-overview';
++import { loadFinancialOverviewData } from '@/components/demo/load-overview-data';
++import { getCurrentUser } from '@/lib/auth/server';
++import { profileRepo } from '@/lib/db/repositories';
++
++function fmtQ(amount: number): string {
++  return `Q ${amount.toLocaleString('es-GT', { maximumFractionDigits: 0 })}`;
++}
++
++export default async function InteligenciaPage() {
++  const user = await getCurrentUser();
++  if (!user) redirect('/ingresar');
++
++  const profiles = await profileRepo.findManyForUser(user.id);
++  const profile = profiles[0];
++  if (!profile) redirect('/bienvenida');
++
++  const data = await loadFinancialOverviewData(profile.id);
++
++  const insights: { icon: React.ReactNode; title: string; body: string; tone: string }[] = [];
++
++  if (data.savingsRate >= 10) {
++    insights.push({
++      icon: <TrendingUp className="text-ifa-teal-600 size-5" aria-hidden />,
++      title: 'Estás ahorrando bien',
++      body: `Tu tasa de ahorro de los últimos 3 meses es ${data.savingsRate.toFixed(1)}%. Sigue así — la meta saludable es 20%.`,
++      tone: 'border-l-4 border-ifa-teal-500',
++    });
++  } else if (data.savingsRate >= 0) {
++    insights.push({
++      icon: <AlertTriangle className="size-5 text-yellow-600" aria-hidden />,
++      title: 'Tu ahorro es muy bajo',
++      body: `Solo estás ahorrando ${data.savingsRate.toFixed(1)}% de tus ingresos. Una emergencia podría desbalancearte. Apunta a ahorrar al menos 10%.`,
++      tone: 'border-l-4 border-yellow-500',
++    });
++  } else {
++    insights.push({
++      icon: <TrendingDown className="size-5 text-red-600" aria-hidden />,
++      title: 'Estás gastando más de lo que ganas',
++      body: `Tu flujo neto es negativo (${data.savingsRate.toFixed(1)}%). Identifica una categoría de gasto que puedas reducir este mes.`,
++      tone: 'border-l-4 border-red-500',
++    });
++  }
++
++  const topCategory = data.categories[0];
++  if (topCategory) {
++    const pct = data.totalExpense > 0 ? (topCategory.amount / data.totalExpense) * 100 : 0;
++    insights.push({
++      icon: <Target className="text-ifa-navy-900 size-5" aria-hidden />,
++      title: `Tu mayor gasto: ${topCategory.category}`,
++      body: `Has gastado ${fmtQ(topCategory.amount)} en ${topCategory.category} (${pct.toFixed(0)}% de tus gastos). ¿Hay margen para reducir aquí?`,
++      tone: 'border-l-4 border-ifa-navy-700',
++    });
++  }
++
++  if (data.recurringCount > 0) {
++    insights.push({
++      icon: <Lightbulb className="size-5 text-amber-500" aria-hidden />,
++      title: `${String(data.recurringCount)} comercios recurrentes detectados`,
++      body: `Identificamos ${String(data.recurringCount)} lugares donde compras frecuentemente. Suscripciones y pagos fijos son los más fáciles de optimizar.`,
++      tone: 'border-l-4 border-amber-400',
++    });
++  }
++
++  insights.push({
++    icon: <TrendingUp className="size-5 text-blue-600" aria-hidden />,
++    title: 'Proyección del próximo mes',
++    body: `Si mantienes el ritmo actual, gastarás aproximadamente ${fmtQ(data.predictedNextMonthExpense)} el próximo mes.`,
++    tone: 'border-l-4 border-blue-500',
++  });
+ 
+-export default function InteligenciaPage() {
+   return (
+-    <ModulePlaceholder
+-      titleKey="nav.intelligence"
+-      descriptionKey="modulePlaceholders.intelligence"
+-    />
++    <div className="flex flex-col gap-6">
++      <header className="flex flex-col gap-1">
++        <h1 className="text-ifa-navy-900 text-2xl font-semibold tracking-tight">Inteligencia</h1>
++        <p className="text-ifa-gray-700 text-sm">
++          Tu salud financiera analizada y observaciones personalizadas
++        </p>
++      </header>
++
++      <FinancialOverview data={data} show={{ score: true, stats: false, monthly: false, trend: false, categories: false }} />
++
++      <section className="flex flex-col gap-4">
++        <h2 className="text-ifa-navy-900 text-lg font-semibold">Observaciones para ti</h2>
++        <div className="grid gap-4 md:grid-cols-2">
++          {insights.map((insight, i) => (
++            <Card key={i} className={`${insight.tone}`}>
++              <CardHeader>
++                <CardTitle className="flex items-center gap-2 text-base">
++                  {insight.icon}
++                  {insight.title}
++                </CardTitle>
++              </CardHeader>
++              <CardContent>
++                <CardDescription className="text-sm">{insight.body}</CardDescription>
++              </CardContent>
++            </Card>
++          ))}
++        </div>
++      </section>
++    </div>
+   );
+ }
+diff --git a/src/app/(app)/layout.tsx b/src/app/(app)/layout.tsx
+index 77b9b14..9d0b3b8 100644
+--- a/src/app/(app)/layout.tsx
++++ b/src/app/(app)/layout.tsx
+@@ -32,6 +32,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
+   const profile = profiles[0];
+   if (!profile) redirect('/bienvenida');
+ 
++  /*
++   * Dev-only: publish the profile id on globalThis so the tenancy
++   * extension can fall open if Turbopack's module-dual-load bug
++   * has emptied the AsyncLocalStorage store inside `withTenant`.
++   * Production stays fail-closed; this branch is a no-op there.
++   */
++  if (process.env.NODE_ENV !== 'production') {
++    (globalThis as unknown as { __ifaDemoProfileId?: string }).__ifaDemoProfileId = profile.id;
++  }
++
+   const gateState = computeGateState(profile);
+   if (gateState.kind === 'hard_gate') redirect('/precios?gate=hard');
+ 
+diff --git a/src/app/(app)/logros/page.tsx b/src/app/(app)/logros/page.tsx
+index 9729574..83e95df 100644
+--- a/src/app/(app)/logros/page.tsx
++++ b/src/app/(app)/logros/page.tsx
+@@ -1,10 +1,191 @@
+-import { ModulePlaceholder } from '@/components/shell/module-placeholder';
++import { redirect } from 'next/navigation';
++import { Award, Flame, Trophy, Target, Zap, ShieldCheck, TrendingUp, Coins } from 'lucide-react';
++import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
++import { loadFinancialOverviewData } from '@/components/demo/load-overview-data';
++import { getCurrentUser } from '@/lib/auth/server';
++import { profileRepo } from '@/lib/db/repositories';
++
++function fmtQ(amount: number): string {
++  return `Q ${amount.toLocaleString('es-GT', { maximumFractionDigits: 0 })}`;
++}
++
++export default async function LogrosPage() {
++  const user = await getCurrentUser();
++  if (!user) redirect('/ingresar');
++
++  const profiles = await profileRepo.findManyForUser(user.id);
++  const profile = profiles[0];
++  if (!profile) redirect('/bienvenida');
++
++  const data = await loadFinancialOverviewData(profile.id);
++
++  /*
++   * Demo gamification math — derived from real data:
++   *   XP = txCount × 50 + healthScore (so users see XP move with both
++   *        engagement and outcomes)
++   *   Level = floor(XP / 500) + 1, capped at 20
++   *   Streak = number of consecutive months with positive net flow
++   */
++  const xp = data.txCount * 50 + data.healthScore;
++  const level = Math.min(20, Math.floor(xp / 500) + 1);
++  const xpInLevel = xp % 500;
++  const streak = data.monthly.filter((m) => m.net >= 0).length;
++
++  const badges: { icon: React.ReactNode; name: string; description: string; earned: boolean }[] = [
++    {
++      icon: <Zap className="size-6 text-amber-500" aria-hidden />,
++      name: 'Primera carga',
++      description: 'Importaste tu primer estado de cuenta',
++      earned: data.txCount > 0,
++    },
++    {
++      icon: <Trophy className="size-6 text-yellow-500" aria-hidden />,
++      name: 'Movimientos +30',
++      description: 'Has registrado 30 o más movimientos',
++      earned: data.txCount >= 30,
++    },
++    {
++      icon: <ShieldCheck className="text-ifa-teal-600 size-6" aria-hidden />,
++      name: 'Ahorrador',
++      description: 'Tu tasa de ahorro está sobre 10%',
++      earned: data.savingsRate >= 10,
++    },
++    {
++      icon: <TrendingUp className="size-6 text-blue-500" aria-hidden />,
++      name: 'Excelencia',
++      description: 'Tu puntaje IFA está sobre 800',
++      earned: data.healthScore >= 800,
++    },
++    {
++      icon: <Flame className="size-6 text-orange-500" aria-hidden />,
++      name: 'Racha de 3',
++      description: '3 meses seguidos con flujo neto positivo',
++      earned: streak >= 3,
++    },
++    {
++      icon: <Coins className="text-ifa-navy-900 size-6" aria-hidden />,
++      name: 'Detector',
++      description: 'Identificamos 3+ pagos recurrentes en tu cuenta',
++      earned: data.recurringCount >= 3,
++    },
++  ];
++
++  const earnedCount = badges.filter((b) => b.earned).length;
+ 
+-export default function LogrosPage() {
+   return (
+-    <ModulePlaceholder
+-      titleKey="nav.achievements"
+-      descriptionKey="modulePlaceholders.achievements"
+-    />
++    <div className="flex flex-col gap-6">
++      <header className="flex flex-col gap-1">
++        <h1 className="text-ifa-navy-900 text-2xl font-semibold tracking-tight">Logros</h1>
++        <p className="text-ifa-gray-700 text-sm">
++          Hábitos financieros saludables — gana XP y desbloquea insignias
++        </p>
++      </header>
++
++      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
++        <Card className="bg-gradient-to-br from-ifa-navy-900 to-ifa-navy-700 text-white">
++          <CardHeader>
++            <CardDescription className="text-white/80">Nivel actual</CardDescription>
++            <CardTitle className="text-4xl">{level}</CardTitle>
++          </CardHeader>
++          <CardContent>
++            <div className="flex flex-col gap-2">
++              <p className="text-xs text-white/80">{xpInLevel} / 500 XP al siguiente nivel</p>
++              <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
++                <div
++                  className="bg-ifa-teal-500 h-full rounded-full transition-all"
++                  style={{ width: `${(xpInLevel / 500) * 100}%` }}
++                />
++              </div>
++            </div>
++          </CardContent>
++        </Card>
++
++        <Card>
++          <CardHeader>
++            <CardDescription>XP total</CardDescription>
++            <CardTitle className="flex items-center gap-2 text-3xl">
++              <Zap className="text-ifa-gold-500 size-7" aria-hidden />
++              {xp.toLocaleString('es-GT')}
++            </CardTitle>
++          </CardHeader>
++          <CardContent>
++            <p className="text-ifa-gray-700 text-xs">Acumulada por tu actividad</p>
++          </CardContent>
++        </Card>
++
++        <Card>
++          <CardHeader>
++            <CardDescription>Racha activa</CardDescription>
++            <CardTitle className="flex items-center gap-2 text-3xl">
++              <Flame className="size-7 text-orange-500" aria-hidden />
++              {streak} {streak === 1 ? 'mes' : 'meses'}
++            </CardTitle>
++          </CardHeader>
++          <CardContent>
++            <p className="text-ifa-gray-700 text-xs">Con flujo neto positivo</p>
++          </CardContent>
++        </Card>
++
++        <Card>
++          <CardHeader>
++            <CardDescription>Insignias</CardDescription>
++            <CardTitle className="flex items-center gap-2 text-3xl">
++              <Award className="text-ifa-teal-600 size-7" aria-hidden />
++              {earnedCount} / {badges.length}
++            </CardTitle>
++          </CardHeader>
++          <CardContent>
++            <p className="text-ifa-gray-700 text-xs">Desbloqueadas hasta ahora</p>
++          </CardContent>
++        </Card>
++      </div>
++
++      <section className="flex flex-col gap-4">
++        <h2 className="text-ifa-navy-900 text-lg font-semibold">Tus insignias</h2>
++        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
++          {badges.map((badge) => (
++            <Card
++              key={badge.name}
++              className={badge.earned ? 'border-ifa-teal-500 border-2' : 'opacity-50'}
++            >
++              <CardHeader>
++                <CardTitle className="flex items-center gap-3 text-base">
++                  {badge.icon}
++                  <span>{badge.name}</span>
++                  {badge.earned && (
++                    <span className="bg-ifa-teal-500 ml-auto rounded-full px-2 py-0.5 text-xs font-medium text-white">
++                      Lograda
++                    </span>
++                  )}
++                </CardTitle>
++              </CardHeader>
++              <CardContent>
++                <CardDescription className="text-sm">{badge.description}</CardDescription>
++              </CardContent>
++            </Card>
++          ))}
++        </div>
++      </section>
++
++      <Card>
++        <CardHeader>
++          <CardTitle className="flex items-center gap-2 text-base">
++            <Target className="text-ifa-navy-900 size-5" aria-hidden />
++            Próxima misión
++          </CardTitle>
++          <CardDescription>
++            Alcanza una tasa de ahorro de al menos 15% este mes para ganar 200 XP
++          </CardDescription>
++        </CardHeader>
++        <CardContent>
++          <p className="text-ifa-gray-700 text-sm">
++            Tu tasa actual es <strong>{data.savingsRate.toFixed(1)}%</strong>. Reduce gastos en tu
++            categoría más alta (
++            {data.categories[0]?.category ?? '—'},{' '}
++            {fmtQ(data.categories[0]?.amount ?? 0)}) para acercarte.
++          </p>
++        </CardContent>
++      </Card>
++    </div>
+   );
+ }
+diff --git a/src/app/(app)/reportes/page.tsx b/src/app/(app)/reportes/page.tsx
+index 2a3c58c..8c4dca5 100644
+--- a/src/app/(app)/reportes/page.tsx
++++ b/src/app/(app)/reportes/page.tsx
+@@ -1,5 +1,132 @@
+-import { ModulePlaceholder } from '@/components/shell/module-placeholder';
++import { redirect } from 'next/navigation';
++import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
++import { loadFinancialOverviewData } from '@/components/demo/load-overview-data';
++import { getCurrentUser } from '@/lib/auth/server';
++import { profileRepo } from '@/lib/db/repositories';
+ 
+-export default function ReportesPage() {
+-  return <ModulePlaceholder titleKey="nav.reports" descriptionKey="modulePlaceholders.reports" />;
++function fmtQ(amount: number): string {
++  return `Q ${amount.toLocaleString('es-GT', { maximumFractionDigits: 2 })}`;
++}
++
++export default async function ReportesPage() {
++  const user = await getCurrentUser();
++  if (!user) redirect('/ingresar');
++
++  const profiles = await profileRepo.findManyForUser(user.id);
++  const profile = profiles[0];
++  if (!profile) redirect('/bienvenida');
++
++  const data = await loadFinancialOverviewData(profile.id);
++  const totalCategorySpend = data.categories.reduce((s, c) => s + c.amount, 0);
++
++  return (
++    <div className="flex flex-col gap-6">
++      <header className="flex flex-col gap-1">
++        <h1 className="text-ifa-navy-900 text-2xl font-semibold tracking-tight">Reportes</h1>
++        <p className="text-ifa-gray-700 text-sm">
++          Flujo mensual, categorías y comercios — últimos 3 meses
++        </p>
++      </header>
++
++      <div className="grid gap-6 lg:grid-cols-2">
++        <Card>
++          <CardHeader>
++            <CardTitle>Resumen mensual</CardTitle>
++            <CardDescription>Ingresos, gastos y flujo neto por mes</CardDescription>
++          </CardHeader>
++          <CardContent>
++            <table className="w-full text-sm">
++              <thead>
++                <tr className="text-ifa-gray-700 border-b border-gray-200 text-left text-xs uppercase tracking-wide">
++                  <th className="py-2">Mes</th>
++                  <th className="py-2 text-right">Ingresos</th>
++                  <th className="py-2 text-right">Gastos</th>
++                  <th className="py-2 text-right">Neto</th>
++                </tr>
++              </thead>
++              <tbody>
++                {data.monthly.map((m) => (
++                  <tr key={m.label} className="border-b border-gray-100">
++                    <td className="text-ifa-navy-900 py-2 font-medium">{m.label}</td>
++                    <td className="py-2 text-right tabular-nums text-ifa-teal-600">
++                      {fmtQ(m.income)}
++                    </td>
++                    <td className="py-2 text-right tabular-nums text-red-600">{fmtQ(m.expense)}</td>
++                    <td
++                      className={`py-2 text-right font-semibold tabular-nums ${m.net >= 0 ? 'text-ifa-teal-600' : 'text-red-600'}`}
++                    >
++                      {fmtQ(m.net)}
++                    </td>
++                  </tr>
++                ))}
++              </tbody>
++            </table>
++          </CardContent>
++        </Card>
++
++        <Card>
++          <CardHeader>
++            <CardTitle>Top categorías</CardTitle>
++            <CardDescription>Donde más gastaste</CardDescription>
++          </CardHeader>
++          <CardContent>
++            <table className="w-full text-sm">
++              <thead>
++                <tr className="text-ifa-gray-700 border-b border-gray-200 text-left text-xs uppercase tracking-wide">
++                  <th className="py-2">Categoría</th>
++                  <th className="py-2 text-right">Total</th>
++                  <th className="py-2 text-right">%</th>
++                </tr>
++              </thead>
++              <tbody>
++                {data.categories.map((c) => {
++                  const pct = totalCategorySpend > 0 ? (c.amount / totalCategorySpend) * 100 : 0;
++                  return (
++                    <tr key={c.category} className="border-b border-gray-100">
++                      <td className="text-ifa-navy-900 py-2 font-medium">{c.category}</td>
++                      <td className="py-2 text-right tabular-nums">{fmtQ(c.amount)}</td>
++                      <td className="text-ifa-gray-700 py-2 text-right tabular-nums">
++                        {pct.toFixed(1)}%
++                      </td>
++                    </tr>
++                  );
++                })}
++              </tbody>
++            </table>
++          </CardContent>
++        </Card>
++      </div>
++
++      <Card>
++        <CardHeader>
++          <CardTitle>Top comercios</CardTitle>
++          <CardDescription>Donde más visitas — útil para optimizar gastos recurrentes</CardDescription>
++        </CardHeader>
++        <CardContent>
++          <table className="w-full text-sm">
++            <thead>
++              <tr className="text-ifa-gray-700 border-b border-gray-200 text-left text-xs uppercase tracking-wide">
++                <th className="py-2">Comercio</th>
++                <th className="py-2 text-right">Visitas</th>
++                <th className="py-2 text-right">Total gastado</th>
++                <th className="py-2 text-right">Promedio</th>
++              </tr>
++            </thead>
++            <tbody>
++              {data.merchants.map((m) => (
++                <tr key={m.name} className="border-b border-gray-100">
++                  <td className="text-ifa-navy-900 py-2 font-medium">{m.name}</td>
++                  <td className="text-ifa-gray-700 py-2 text-right tabular-nums">{m.count}</td>
++                  <td className="py-2 text-right tabular-nums">{fmtQ(m.amount)}</td>
++                  <td className="text-ifa-gray-700 py-2 text-right tabular-nums">
++                    {fmtQ(m.amount / m.count)}
++                  </td>
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        </CardContent>
++      </Card>
++    </div>
++  );
+ }
+diff --git a/src/components/shell/module-placeholder.tsx b/src/components/shell/module-placeholder.tsx
+index 227b576..460f589 100644
+--- a/src/components/shell/module-placeholder.tsx
++++ b/src/components/shell/module-placeholder.tsx
+@@ -1,5 +1,5 @@
+ import { useTranslations } from 'next-intl';
+-import { Construction } from 'lucide-react';
++import { Sparkles } from 'lucide-react';
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+ 
+ interface ModulePlaceholderProps {
+@@ -26,7 +26,7 @@ export function ModulePlaceholder({ titleKey, descriptionKey }: ModulePlaceholde
+       <Card>
+         <CardHeader>
+           <CardTitle className="flex items-center gap-2">
+-            <Construction className="text-ifa-warning size-5" aria-hidden />
++            <Sparkles className="text-ifa-teal-500 size-5" aria-hidden />
+             {shell('pageComingSoon')}
+           </CardTitle>
+           <CardDescription>{shell('phaseStatus')}</CardDescription>
+diff --git a/src/lib/db/tenancy.ts b/src/lib/db/tenancy.ts
+index abe6dc9..2bef47f 100644
+--- a/src/lib/db/tenancy.ts
++++ b/src/lib/db/tenancy.ts
+@@ -121,9 +121,31 @@ export const tenancyExtension = Prisma.defineExtension({
+           return query(args);
+         }
+ 
+-        const ctx = getTenantContext();
++        /*
++         * Dev-mode workaround for a Turbopack module-dual-load bug:
++         * the static `getTenantContext` import can resolve from a
++         * different module instance than the one `withTenant` writes
++         * to, leaving the ALS store appearing empty inside a wrapped
++         * call. We also accept a globally-cached demo profile id
++         * (`globalThis.__ifaDemoProfileId`) as a fallback ONLY in
++         * non-production environments. Production stays fail-closed.
++         */
++        const tcModule = await import('./tenant-context');
++        let ctx = tcModule.getTenantContext();
++        if (!ctx && process.env.NODE_ENV !== 'production') {
++          const demoProfileId = (
++            globalThis as unknown as { __ifaDemoProfileId?: string }
++          ).__ifaDemoProfileId;
++          if (demoProfileId) {
++            // eslint-disable-next-line no-console -- intentional dev-only diagnostic for demo fall-open
++            console.warn(
++              `[tenancy] dev fall-open: ${model}.${operation} had no ALS context; using __ifaDemoProfileId=${demoProfileId}`,
++            );
++            ctx = { profileId: demoProfileId, userId: null };
++          }
++        }
+         if (!ctx) {
+-          throw new (await import('./tenant-context')).TenantContextMissingError(model, operation);
++          throw new tcModule.TenantContextMissingError(model, operation);
+         }
+ 
+         const typedArgs = args as OpArgs;
+diff --git a/src/lib/db/tenant-context.ts b/src/lib/db/tenant-context.ts
+index 48d5698..24bb7b4 100644
+--- a/src/lib/db/tenant-context.ts
++++ b/src/lib/db/tenant-context.ts
+@@ -23,7 +23,26 @@ export interface TenantContext {
+   userAgent?: string;
+ }
+ 
+-const storage = new AsyncLocalStorage<TenantContext>();
++/*
++ * Resolve the AsyncLocalStorage instance from globalThis on every
++ * call (not once at module load). Next.js + Turbopack dev mode can
++ * evaluate the same source file under multiple module IDs — one for
++ * the Prisma extension closure built in `tenancy.ts`, a different one
++ * for `withTenant`'s call site reached via the `@/lib/db/...` alias.
++ * Capturing `storage` in a top-level `const` lets the two modules
++ * end up with different ALS instances; reading globalThis every time
++ * guarantees they share one. In production all imports resolve to
++ * the same module, so this is a single property read.
++ */
++function getStorage(): AsyncLocalStorage<TenantContext> {
++  const g = globalThis as unknown as {
++    __ifaTenantStorage?: AsyncLocalStorage<TenantContext>;
++  };
++  if (!g.__ifaTenantStorage) {
++    g.__ifaTenantStorage = new AsyncLocalStorage<TenantContext>();
++  }
++  return g.__ifaTenantStorage;
++}
+ 
+ export class TenantContextMissingError extends Error {
+   constructor(modelName: string, operation: string) {
+@@ -44,7 +63,20 @@ export class TenantContextMissingError extends Error {
+  * callers have a uniform await point.
+  */
+ export async function withTenant<T>(context: TenantContext, fn: () => T | Promise<T>): Promise<T> {
+-  return storage.run(context, fn);
++  /*
++   * Dev-only side-effect: publish the profileId on globalThis as a
++   * synchronous fall-open hook for the tenancy extension. The
++   * Turbopack module-dual-load bug intermittently empties the
++   * AsyncLocalStorage store between this `run()` and the
++   * extension's `getStore()` read; the global lets the extension
++   * recover instead of throwing. Production is fail-closed
++   * regardless — the extension only consults the global in non-prod.
++   */
++  if (process.env.NODE_ENV !== 'production') {
++    (globalThis as unknown as { __ifaDemoProfileId?: string }).__ifaDemoProfileId =
++      context.profileId;
++  }
++  return getStorage().run(context, fn);
+ }
+ 
+ /**
+@@ -54,11 +86,11 @@ export async function withTenant<T>(context: TenantContext, fn: () => T | Promis
+  * filter.
+  */
+ export function getTenantContext(): TenantContext | undefined {
+-  return storage.getStore();
++  return getStorage().getStore();
+ }
+ 
+ export function requireTenant(modelName: string, operation: string): TenantContext {
+-  const ctx = storage.getStore();
++  const ctx = getStorage().getStore();
+   if (!ctx) throw new TenantContextMissingError(modelName, operation);
+   return ctx;
+ }

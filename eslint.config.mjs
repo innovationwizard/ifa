@@ -22,6 +22,14 @@ export default tseslint.config(
       'out/**',
       '.vercel/**',
       'pnpm-lock.yaml',
+      /*
+       * Demo emergency kit (see demo/REACTIVATE.md): a frozen
+       * snapshot of files we shipped during a one-off client demo.
+       * Treated as an artifact, not source — never linted or
+       * type-checked from this location. The active copies (when the
+       * kit is re-activated) live under their real `src/` paths.
+       */
+      'demo/**',
     ],
   },
 
