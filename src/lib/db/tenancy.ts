@@ -45,6 +45,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'Integration',
   'AuditLog',
   'Notification',
+  'MerchantCategory',
 ]);
 
 const READ_OPERATIONS_WITH_WHERE = new Set<string>([

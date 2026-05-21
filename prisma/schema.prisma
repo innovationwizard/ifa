@@ -1080,3 +1080,92 @@ model Notification {
   @@index([profileId, createdAt(sort: Desc)])
   @@map("notifications")
 }
+
+// =============================================================================
+// Phase 7 — AI categorization + Health Score infrastructure
+// =============================================================================
+
+/// Source of a merchant→category mapping. AI is the default (Claude
+/// Haiku); USER is set when the user overrides the AI categorization
+/// on a specific merchant — that becomes a permanent rule for future
+/// transactions from the same merchant.
+enum CategorySource {
+  AI
+  USER
+}
+
+/// Per-Profile cache of merchant→category resolutions. Lookup key is
+/// the NIT (preferred when present) or a normalized merchant name
+/// (lower-case, accent-stripped, whitespace-collapsed). Cache hits
+/// avoid the Anthropic API entirely; cost telemetry on every miss.
+///
+/// Tenant-scoped per scaffolding §3 — listed in TENANT_SCOPED_MODELS
+/// in src/lib/db/tenancy.ts so cross-tenant lookups can't leak.
+model MerchantCategory {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  profileId    String         @db.Uuid
+  lookupKey    String
+  category     String
+  source       CategorySource @default(AI)
+  /// 0..1 from Claude; null for USER-set rows where confidence has
+  /// no meaning (the user is the source of truth).
+  aiConfidence Float?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([profileId, lookupKey], name: "uniq_profile_lookup_key")
+  @@index([profileId])
+  @@map("merchant_categories")
+}
+
+/// Job type discriminator for the Postgres-backed work queue. Each
+/// value maps to a handler in src/lib/jobs/handlers/index.ts.
+///
+/// New values are append-only — Postgres enum semantics mean any
+/// drop is a destructive migration.
+enum JobType {
+  CATEGORIZE_TRANSACTION
+  DETECT_ANOMALY
+}
+
+/// Lifecycle of a queued job. PENDING → RUNNING (claimed by a
+/// worker) → DONE or FAILED. Dead-lettered jobs stay in FAILED with
+/// `attempts >= MAX_ATTEMPTS` so the queue depth doesn't keep
+/// retrying forever.
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// Generic background-job queue, polled by a Vercel Cron once per
+/// minute (Batch 4). Workers use SELECT ... FOR UPDATE SKIP LOCKED
+/// to claim rows atomically, so two cron firings can run in
+/// parallel without double-processing.
+///
+/// NOT tenant-scoped: the queue is process-shared across all
+/// tenants. Tenant identity flows through `payload.profileId` /
+/// `payload.userId` and the handler restores tenant context via
+/// `withTenant(...)` before touching tenant-scoped tables.
+model PendingJob {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  type        JobType
+  payload     Json      @db.JsonB
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  scheduledAt DateTime  @default(now())
+  /// When a worker claimed the row. Set by the dequeue helper.
+  lockedAt    DateTime?
+  /// Hostname / function-instance id of the worker holding the row.
+  lockedBy    String?
+  /// Last error message recorded by markFailed(). Truncated to a
+  /// reasonable length by the helper to keep row size bounded.
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, scheduledAt])
+  @@index([type, status])
+  @@map("pending_jobs")
+}
