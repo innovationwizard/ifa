@@ -173,6 +173,12 @@
     "title": "Tus movimientos",
     "subtitle": "Todo lo que entra y sale, ordenado por fecha.",
     "importCta": "Subir estado de cuenta",
+    "processBanner": {
+      "headline": "Tienes {count, plural, =1 {1 movimiento} other {# movimientos}} por procesar",
+      "description": "Vamos a ponerles categoría y revisar si hay algo raro.",
+      "cta": "Procesar ahora",
+      "processing": "Procesando..."
+    },
     "sources": {
       "FEL": "Factura",
       "TPV": "Tarjeta",
@@ -262,7 +268,14 @@
       "total": "Total en el archivo",
       "failureNote": "{count} filas tenían errores y no se guardaron. Revisa tu archivo si quieres volver a intentar.",
       "importAnother": "Subir otro archivo",
-      "goDashboard": "Ver mi dashboard"
+      "goDashboard": "Ver mi dashboard",
+      "process": {
+        "headline": "Procesa tus movimientos",
+        "description": "Les ponemos categoría y buscamos si hay algo raro. Toma menos de un minuto.",
+        "cta": "Procesar ahora",
+        "processing": "Procesando...",
+        "doneBody": "Listo, tus movimientos ya están procesados."
+      }
     },
     "errors": {
       "fileTooLarge": "El archivo pesa más de 10 MB. Por ahora solo aceptamos archivos más pequeños.",

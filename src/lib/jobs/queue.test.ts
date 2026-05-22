@@ -154,6 +154,76 @@ describe('jobQueue.claim', () => {
   });
 });
 
+describe('jobQueue.claimForProfile (ADR-001)', () => {
+  it('filters by payload->>profileId in the SQL', async () => {
+    queryRawMock.mockResolvedValue([fakeJob()]);
+
+    await jobQueue.claimForProfile('worker-1', 5, 'profile-uuid-xyz');
+
+    expect(queryRawMock).toHaveBeenCalledTimes(1);
+    const sql = readSql(queryRawMock.mock.calls[0] as unknown[]);
+    expect(sql).toContain("payload->>'profileId'");
+    expect(sql).toContain('FOR UPDATE SKIP LOCKED');
+    expect(sql).toContain('status = \'PENDING\'::"JobStatus"');
+  });
+
+  it('interpolates the profileId as a parameter (not inlined)', async () => {
+    /*
+     * Tagged-template parameterization is the injection-safety guarantee.
+     * Pin the parameter order matching template appearance:
+     * profileId (in the SELECT WHERE), then LIMIT, then workerId
+     * (in the UPDATE SET).
+     */
+    queryRawMock.mockResolvedValue([]);
+
+    await jobQueue.claimForProfile('worker-1', 7, 'profile-uuid-xyz');
+
+    const call = queryRawMock.mock.calls[0] as unknown[];
+    expect(call[1]).toBe('profile-uuid-xyz');
+    expect(call[2]).toBe(7);
+    expect(call[3]).toBe('worker-1');
+  });
+
+  it('short-circuits with empty array when limit <= 0', async () => {
+    const result = await jobQueue.claimForProfile('worker-1', 0, 'profile-uuid-xyz');
+    expect(result).toEqual([]);
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('jobQueue.countPendingForProfile (ADR-001)', () => {
+  it('emits a COUNT(*) filtered by status + profileId', async () => {
+    queryRawMock.mockResolvedValue([{ count: 5n }]);
+
+    const result = await jobQueue.countPendingForProfile('profile-uuid-xyz');
+
+    expect(result).toBe(5);
+    const sql = readSql(queryRawMock.mock.calls[0] as unknown[]);
+    expect(sql).toContain('COUNT(*)');
+    expect(sql).toContain('status = \'PENDING\'::"JobStatus"');
+    expect(sql).toContain("payload->>'profileId'");
+  });
+
+  it('returns 0 when the row is missing (defensive)', async () => {
+    queryRawMock.mockResolvedValue([]);
+    const result = await jobQueue.countPendingForProfile('profile-uuid-xyz');
+    expect(result).toBe(0);
+  });
+
+  it('converts the bigint COUNT(*) to a JS Number', async () => {
+    /*
+     * Postgres COUNT(*) comes back as bigint. The caller expects a
+     * Number; the helper coerces. Pin this so a future refactor that
+     * loses the `Number(...)` cast doesn't ship a bigint to the UI
+     * (where it would break JSON.stringify).
+     */
+    queryRawMock.mockResolvedValue([{ count: 12n }]);
+    const result = await jobQueue.countPendingForProfile('profile-uuid-xyz');
+    expect(typeof result).toBe('number');
+    expect(result).toBe(12);
+  });
+});
+
 describe('jobQueue.markDone', () => {
   it('transitions to DONE and clears lock fields', async () => {
     updateMock.mockResolvedValue(fakeJob({ status: 'DONE' }));

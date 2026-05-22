@@ -1,14 +1,15 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Papa from 'papaparse';
-import { CheckCircle2, FileUp, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle2, FileUp, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
 import { detectColumns, type ColumnMapping, type DetectedBank } from '@/lib/imports/column-detect';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { processPendingJobs } from '@/app/(app)/transacciones/actions';
 
 /**
  * Client-side state machine for /transacciones/importar (S-3.5).
@@ -326,6 +327,9 @@ function ResultStep({
   onDashboard: () => void;
 }) {
   const t = useTranslations('imports');
+  const [processState, setProcessState] = useState<'idle' | 'done'>('idle');
+  const [isProcessing, startProcessing] = useTransition();
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-3 text-center">
@@ -341,6 +345,19 @@ function ResultStep({
         <Metric value={summary.failed} label={t('result.failed')} />
         <Metric value={summary.totalRows} label={t('result.total')} />
       </dl>
+
+      {summary.imported > 0 && (
+        <ProcessCta
+          state={processState}
+          isProcessing={isProcessing}
+          onProcess={() => {
+            startProcessing(async () => {
+              await processPendingJobs();
+              setProcessState('done');
+            });
+          }}
+        />
+      )}
 
       {summary.failed > 0 && (
         <Alert variant="default" role="alert">
@@ -358,6 +375,49 @@ function ResultStep({
         </Button>
         <Button onClick={onDashboard}>{t('result.goDashboard')}</Button>
       </div>
+    </div>
+  );
+}
+
+function ProcessCta({
+  state,
+  isProcessing,
+  onProcess,
+}: {
+  state: 'idle' | 'done';
+  isProcessing: boolean;
+  onProcess: () => void;
+}) {
+  const t = useTranslations('imports.result.process');
+
+  if (state === 'done') {
+    return (
+      <div className="border-ifa-teal-200 bg-ifa-teal-50 flex items-center gap-3 rounded-lg border p-4">
+        <CheckCircle2 className="text-ifa-teal-700 size-5 shrink-0" aria-hidden />
+        <p className="text-ifa-navy-900 text-sm">{t('doneBody')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-ifa-teal-200 bg-ifa-teal-50 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Sparkles className="text-ifa-teal-700 mt-0.5 size-5 shrink-0" aria-hidden />
+        <div className="flex flex-col gap-0.5">
+          <p className="text-ifa-navy-900 text-sm font-medium">{t('headline')}</p>
+          <p className="text-ifa-gray-700 text-xs">{t('description')}</p>
+        </div>
+      </div>
+      <Button size="sm" onClick={onProcess} disabled={isProcessing} className="w-full sm:w-auto">
+        {isProcessing ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            <span>{t('processing')}</span>
+          </>
+        ) : (
+          t('cta')
+        )}
+      </Button>
     </div>
   );
 }

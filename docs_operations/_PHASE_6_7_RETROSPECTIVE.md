@@ -237,3 +237,19 @@ weeks of `HealthScore` rows accumulate, the factor weights (B9's
 `FACTOR_WEIGHTS`) can be re-tuned against observed score
 distributions; if everyone scores 700+ we're undermeasuring, if
 everyone scores below 400 we're punishing too hard.
+
+## 8. Post-closure revisions
+
+Decisions that landed after the phase officially closed
+(2026-05-21) but that change shipped Phase 6/7 behavior.
+Numbered with the ADR they reference.
+
+- **ADR-001** ([\_DECISIONS.md](./_DECISIONS.md), 2026-05-22):
+  Removed B4's every-minute `/api/cron/jobs` Vercel Cron entry.
+  Job-queue drain becomes user-triggered via a "Procesar ahora"
+  button (post-import CTA + `/transacciones` contextual banner).
+  Reason: >99% of cron firings would do zero productive work at
+  MVP traffic shape; Vercel free tier blocks sub-daily crons
+  anyway. Endpoint stays as a manual ops drain. See ADR-001 for
+  the full reasoning + the JSONB-filtered claim variant
+  (`jobQueue.claimForProfile`).

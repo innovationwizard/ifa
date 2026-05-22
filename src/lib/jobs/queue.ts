@@ -131,6 +131,60 @@ export const jobQueue = {
     `;
   },
 
+  /**
+   * Tenant-scoped claim — only picks PENDING rows whose
+   * `payload->>'profileId'` matches the given id. Powers the
+   * user-triggered "Procesar ahora" button (ADR-001) so a click
+   * from user A never drains user B's queue.
+   *
+   * `PendingJob` doesn't carry `profileId` as a top-level column;
+   * both shipped job types (`CATEGORIZE_TRANSACTION`,
+   * `DETECT_ANOMALY`) embed it in `payload`. Filtering via JSONB
+   * `->>` extraction is correct but doesn't use the
+   * `(status, scheduledAt)` index — at MVP scale the table won't
+   * exceed a few hundred PENDING rows per user, so seq-scan is
+   * fine. The ADR documents the functional-index follow-up if the
+   * table grows past ~10k PENDING rows.
+   */
+  async claimForProfile(workerId: string, limit: number, profileId: string): Promise<PendingJob[]> {
+    if (limit <= 0) return [];
+    return prismaUnscoped.$queryRaw<PendingJob[]>`
+      WITH claimed AS (
+        SELECT id FROM pending_jobs
+        WHERE status = 'PENDING'::"JobStatus"
+          AND "scheduledAt" <= NOW()
+          AND payload->>'profileId' = ${profileId}
+        ORDER BY "scheduledAt" ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT ${limit}
+      )
+      UPDATE pending_jobs
+      SET status = 'RUNNING'::"JobStatus",
+          "lockedAt" = NOW(),
+          "lockedBy" = ${workerId},
+          "updatedAt" = NOW()
+      WHERE id IN (SELECT id FROM claimed)
+      RETURNING *
+    `;
+  },
+
+  /**
+   * Cheap COUNT(*) of PENDING rows for a given profile. Powers the
+   * `/transacciones` "you have X movimientos por procesar" banner —
+   * the banner is hidden when this returns 0. Same JSONB filter as
+   * `claimForProfile`.
+   */
+  async countPendingForProfile(profileId: string): Promise<number> {
+    const rows = await prismaUnscoped.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count
+      FROM pending_jobs
+      WHERE status = 'PENDING'::"JobStatus"
+        AND "scheduledAt" <= NOW()
+        AND payload->>'profileId' = ${profileId}
+    `;
+    return Number(rows[0]?.count ?? 0n);
+  },
+
   /** Terminal success. Idempotent — markDone on an already-DONE row no-ops. */
   async markDone(jobId: string): Promise<void> {
     await prismaUnscoped.pendingJob.update({
