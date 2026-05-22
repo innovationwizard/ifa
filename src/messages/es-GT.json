@@ -380,7 +380,58 @@
     },
     "partial": "Faltan datos",
     "previousLabel": "Mes pasado: {score}",
-    "ariaLabel": "Puntaje {score} de {max}, {tier}"
+    "ariaLabel": "Puntaje {score} de {max}, {tier}",
+    "detail": {
+      "title": "Tu puntaje de salud financiera",
+      "subtitle": "Cómo te va con tu dinero, mes a mes.",
+      "factorsCardTitle": "Tus seis factores",
+      "factorsCardSubtitle": "Toca una barra para ver el detalle.",
+      "historyCardTitle": "Tu puntaje en el tiempo",
+      "historyEmpty": "Aún no hay historial. Vuelve después de unos días para ver tu progreso.",
+      "emptyTitle": "Aún no tienes un puntaje",
+      "emptyBody": "Calculamos tu puntaje con base en tus movimientos. Súbenos un estado de cuenta para empezar.",
+      "emptyCta": "Calcular ahora"
+    },
+    "factors": {
+      "spendingDiscipline": {
+        "name": "Disciplina de gasto",
+        "formula": "Qué tan parecidos son tus gastos cada mes en los últimos 6 meses. Más parecidos = puntaje más alto."
+      },
+      "incomeStability": {
+        "name": "Estabilidad de ingresos",
+        "formula": "Qué tan parecidos son tus ingresos cada mes en los últimos 6 meses. Sueldo fijo = puntaje más alto."
+      },
+      "savingsRate": {
+        "name": "Tasa de ahorro",
+        "formula": "Cuánto ahorras de cada Q100 que entran, en los últimos 3 meses. Meta: 30%."
+      },
+      "cashFlowConsistency": {
+        "name": "Consistencia del flujo",
+        "formula": "Qué tan estable es tu ingresos menos gastos cada mes, en los últimos 6 meses."
+      },
+      "recurringSpending": {
+        "name": "Gasto recurrente",
+        "formula": "Cuánto de tu gasto es en lugares donde gastas seguido. Es más fácil presupuestar lo que es predecible."
+      },
+      "anomalyRate": {
+        "name": "Movimientos inusuales",
+        "formula": "Cuántos movimientos raros detectamos en los últimos 3 meses. Menos = puntaje más alto."
+      }
+    },
+    "improvements": {
+      "title": "Cómo subir tu puntaje",
+      "emptyTitle": "Vas muy bien",
+      "emptyBody": "No tenemos sugerencias por ahora. Sigue así.",
+      "impactPrefix": "Subes",
+      "impactSuffix": "puntos al hacerlo",
+      "completeLabel": "Marcar como hecho",
+      "dismissLabel": "Descartar",
+      "status": {
+        "PENDING": "Pendiente",
+        "COMPLETED": "Hecha",
+        "DISMISSED": "Descartada"
+      }
+    }
   },
   "common": {
     "buttons": {

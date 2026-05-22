@@ -104,6 +104,31 @@ export const healthScoreRepo = {
     });
   },
 
+  /**
+   * Mark a `HealthScoreAction` as COMPLETED — stamp `completedAt`
+   * with the current time. The /dashboard/salud server action calls
+   * this on the user's "Marcar como hecho" click. Tenancy extension
+   * auto-injects `profileId` so a user can never complete another
+   * tenant's action.
+   */
+  markActionCompleted(actionId: string): Promise<HealthScoreAction> {
+    return prisma.healthScoreAction.update({
+      where: { id: actionId },
+      data: { status: 'COMPLETED', completedAt: new Date() },
+    });
+  },
+
+  /**
+   * Mark a `HealthScoreAction` as DISMISSED. No timestamp — the
+   * row's `updatedAt` carries that.
+   */
+  markActionDismissed(actionId: string): Promise<HealthScoreAction> {
+    return prisma.healthScoreAction.update({
+      where: { id: actionId },
+      data: { status: 'DISMISSED' },
+    });
+  },
+
   count(args: Prisma.HealthScoreCountArgs = {}): Promise<number> {
     return prisma.healthScore.count(args);
   },

@@ -731,14 +731,27 @@ previousScore?, partial? }`; renders a horizontal track with the
 ### Batch 13 — Score detail page
 
 **Goal:** `/dashboard/salud` — full Health Score view with the
-bullet graph (Batch 12), factor radar, history line chart, and
-improvement actions.
+bullet graph (Batch 12), a horizontal factor-bars chart, history
+line chart, and improvement actions.
+
+**Decision (2026-05-21): radar chart → horizontal factor bars.**
+Originally specced as a Recharts RadarChart. Swapped to a
+horizontal bar chart per the dataviz research (NN/g + Few:
+circular charts are poor for quantitative comparison). The bar
+shape reuses the pattern shipped in Batch 7
+([\_DATAVIZ_BEST_PRACTICES.md §1.2 + §1.5 + §6 rule 1](./_DATAVIZ_BEST_PRACTICES.md)).
+Sort descending by score so the visual ramp from "your
+strongest" → "your weakest" makes imbalance obvious without
+relying on humans to estimate angles. Bars colored by tier from
+Batch 12's `TIER_BANDS` (red / amber / teal / deep-teal) so the
+factor inherits the same color semantics as the overall bullet.
 
 **Files:**
 
 - `src/app/(app)/dashboard/salud/page.tsx` — server component
-- `src/components/health-score/factor-radar.tsx` — Recharts
-  RadarChart over the six factor scores
+- `src/components/health-score/factor-bars.tsx` — horizontal
+  Recharts BarChart of the six factor sub-scores, sorted desc,
+  tier-colored
 - `src/components/health-score/history-chart.tsx` — Recharts
   LineChart of score over time
 - `src/components/health-score/improvement-list.tsx` —
@@ -751,19 +764,19 @@ improvement actions.
 
 **Acceptance criteria (8 items):**
 
-- [ ] Page renders bullet graph + radar + history + actions
+- [x] Page renders bullet graph + factor bars + history + actions
       vertically on mobile, two-column on desktop
-- [ ] Radar chart axes are translated factor names (not technical
-      keys)
-- [ ] Clicking a factor on the radar reveals its formula + current
-      inputs (collapsible card)
-- [ ] Improvement actions sorted by estimated impact, with the
+- [x] Bar labels are translated factor names (not technical keys);
+      sorted by score descending so "weakest" lands at the bottom
+- [x] Clicking a factor reveals its formula + current inputs
+      (collapsible card)
+- [x] Improvement actions sorted by estimated impact, with the
       points-impact number visible
-- [ ] `complete` and `dismiss` actions revalidate the page
-- [ ] No score yet → "Calcula tu primer puntaje" CTA → fires the
+- [x] `complete` and `dismiss` actions revalidate the page
+- [x] No score yet → "Calcula tu primer puntaje" CTA → fires the
       POST recompute endpoint
-- [ ] All copy in tú register, lower-elementary Spanish
-- [ ] Full gate sweep green
+- [x] All copy in tú register, lower-elementary Spanish
+- [x] Full gate sweep green
 
 ---
 
@@ -891,7 +904,7 @@ Format: `[checkbox] Batch N — Name · X/Y in batch · A/101 overall · commit 
 - [x] Batch 10 — Health Score engine + persistence · 7/7 in batch · 66/101 overall · commit `<pending>` · 2026-05-21 - `src/lib/intelligence/health-score/engine.ts` exports pure `computeHealthScore({transactions, now, previousScore})`: iterates `FACTORS` registry, weights × scores → /10 → integer score in [0, 1000]. Returns `{score, previousScore, factors[], partial, partialFactorCount, computedAt}` — deterministic for fixed input. Also exports `snapshotToFactorsJson` (serializer for the JSONB column) and `healthScoreWindow(now)` (canonical 6mo window) - `src/lib/intelligence/health-score/improvements.ts` rule-based generator: 6 per-factor rules (one per FactorKey, sanity-tested), each builds Spanish tú-register copy from the breakdown's `inputs` map. Selection: skip factors with score ≥ 90 OR partial=true (no honest suggestion possible), rank by `estimatedImpact DESC` (= `(target − current) × weight / 10`), cap at 4, fallback to lowest-scoring non-partial factors when nothing strict survives - `src/lib/db/repositories/health-score.ts` exposes `createWithActions` (atomic `$transaction`: parent HealthScore + N HealthScoreAction rows, rollback together if any insert fails), `findLatestForProfile`, `findHistoryForProfile`, `findActionsForScore`, `count`. Re-exported from `repositories/index.ts` - `src/lib/intelligence/health-score/persist.ts` glue: `recomputeHealthScore({profileId, now, period})` wraps everything in `withTenant({profileId, userId: null}, ...)`, reads transactions via `transactionRepo.listAllForReports` (Batch 6), fills `previousScore` from `findLatestForProfile`, computes snapshot, generates improvements, writes atomically. Returns `{snapshot, healthScoreId, actionsCount}` - Unit tests: 9 engine (determinism, in-range score, breakdown shape, previousScore passthrough, partial propagation, snapshotToFactorsJson, healthScoreWindow) + 6 improvements (rule-coverage sanity, sorting, ≥90 skip, partial skip, integer-impact, Spanish-copy register) = 15 new on top of B9's 60 - No AI calls in this batch (improvement copy is rule-based per the plan's risk note — stays as the honest fallback when AI generation lands later) - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 471/471 ✓ playwright 93/93 ✓ next build ✓
 - [x] Batch 11 — Recompute API + history API · 7/7 in batch · 73/101 overall · commit `<pending>` · 2026-05-21 - schema: `Profile.lastHealthScoreRecomputeAt: DateTime?` added (single additive nullable column, no JSONB juggling); `pnpm db:push` synced cleanly (already-in-sync on Supabase dev, generated client picked up the field) - `src/lib/validators/health-score.ts` exports `RECOMPUTE_THROTTLE_MS = 60min`, `HISTORY_LIMIT_DEFAULT=30`/`MAX=90`, `historyQuerySchema` (Zod coerces string/number, clamps [1, 90]), pure `throttleRemainingMs`/`throttleRetryAfterSeconds` helpers - `src/app/api/v1/intelligence/health-score/route.ts`: POST triggers `recomputeHealthScore({period:'ON_DEMAND'})`, returns `{data, healthScoreId}` (200) or `{error:'throttled', retryAfterSeconds}` (429 + `Retry-After` header) when within window; stamps `Profile.lastHealthScoreRecomputeAt` AFTER successful recompute so a failed run doesn't lock the user out. GET returns `{data: HealthScore|null, history: HealthScore[]}` with `?historyLimit=N` (Zod-validated, clamped). Both: 401 anonymous, 400 `no_profile` when user exists without onboarding - Unit tests: 13 validator (defaults, clamp bounds, numeric-string, throttle edge cases) + 9 route (POST 401/400/429/200 incl. first-ever-recompute path, GET 401/default-limit/clamp/empty-state) = 22 new. E2E: 3 auth specs × 3 browsers = 9 - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 493/493 ✓ playwright 102/102 ✓ next build ✓
 - [x] Batch 12 — Bullet graph UI component · 8/8 in batch · 81/101 overall · commit `<pending>` · 2026-05-21 - `src/components/health-score/tier.ts` exports pure `scoreTier(score)` (NaN-safe, clamps to [0,1000], non-finite → critico defensive default), `tierColor(tier)`, `TIER_BANDS` const (4 bands covering full range — pinned by no-gaps test), `SCORE_MIN`/`SCORE_MAX` - `src/components/health-score/bullet.tsx` `<HealthScoreBullet score, previousScore?, partial?>`: div+inline-style implementation (lighter than SVG for this shape), 4 tier-band background segments at 30% opacity, vertical actual-score marker positioned via `%` from the marker percentage with tier color, previous-period tick + hairline connector above the track (omitted when `partial`), Spanish tier label rendered ADJACENT to the number (WCAG 1.4.1 — never relies on color alone), `motion-safe:transition-[left]` for 600ms slide respecting `prefers-reduced-motion`, `role="img"` + `aria-label="Puntaje N de 1000, Tier"` so screen readers don't rely on visual encoding, "Faltan datos" pill swaps for the comparison tick when partial - i18n `healthScore.*` block: tier labels (Crítico/En riesgo/Estable/Excelente), partial pill, previous-period label, ariaLabel template — tú-register Spanish - Unit tests: 16 tier (all 8 boundary values 0/399/400/599/600/799/800/1000, defensive clamp incl. NaN/±Infinity, every tier's color, no-gaps invariant) + 9 bullet RTL (numeric+tier render, rounding, aria-label shape, previous-period tick, partial pill, null previousScore, defensive clamp, motion-safe class present, 4 background segments) = 25 new - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 518/518 ✓ playwright 102/102 ✓ next build ✓
-- [ ] Batch 13 — Score detail page · 0/8 in batch · 0/100 overall
+- [x] Batch 13 — Score detail page · 8/8 in batch · 89/101 overall · commit `<pending>` · 2026-05-21 - **decision: planned RadarChart → horizontal `<BarChart layout="vertical">` sorted desc by score** (NN/g + Few rejection of circular charts for quantitative comparison — see [\_DATAVIZ_BEST_PRACTICES.md §1.2 / §1.5 / §6 rule 1](./_DATAVIZ_BEST_PRACTICES.md)); doc + plan + component renamed accordingly - `src/components/health-score/factor-bars.tsx` Recharts horizontal BarChart of the six sub-scores. Bars tier-colored from Batch 12's `TIER_BANDS` by remapping the [0,100] sub-score onto the [0,1000] tier scale (`scoreTier(score × 10)`), so a factor at 45/100 inherits the same "Crítico" red as overall 450/1000. Click a bar → expand-card with i18n formula + raw `inputs` (cursor:pointer, toggle re-close on second click). Pure `buildFactorBarRows(data, lookup)` helper extracted from the render so unit tests can verify sort + label + color independently of Recharts (`ResponsiveContainer` measures parent width which jsdom reports as 0). 6 unit tests cover the helper - `src/components/health-score/history-chart.tsx` Recharts LineChart with y-axis pinned at `[0, SCORE_MAX]` per Correll et al. anti-truncation research, Spanish-abbr month labels (Ene/Feb/.../Dic), reverses API's newest-first ordering so x-axis reads oldest → newest - `src/components/health-score/improvement-list.tsx` server-rendered cards sorted by `estimatedImpact DESC` with the points-impact number visible (`+12 pts` badge); two server-action buttons per action (complete/dismiss) - `src/app/(app)/dashboard/salud/actions.ts` three server actions: `completeAction(actionId)`, `dismissAction(actionId)`, `recomputeNow()`. All re-resolve the profile per-call, scope via `withTenant`, revalidate `/dashboard/salud` on success; `recomputeNow` is defensively throttle-checked (same window as the API) so the CTA can't bypass `Profile.lastHealthScoreRecomputeAt` - `src/app/(app)/dashboard/salud/page.tsx` server component: two-column desktop / vertical-stack mobile layout (bullet+factor bars left, history+improvements right). Empty state when `findLatestForProfile` returns null renders "Calcula tu primer puntaje" with the recompute server-action button - `src/lib/db/repositories/health-score.ts` adds `markActionCompleted` (stamps `completedAt`) + `markActionDismissed` (sets `status='DISMISSED'`; `HealthScoreAction` has no `updatedAt` so no extra writes) - `src/messages/es-GT.json` adds `healthScore.detail.*` (page chrome, empty state, CTA), `healthScore.factors.*` (six factor names + formulas in tú-register lower-elementary Spanish), `healthScore.improvements.*` (sectionTitle, buttons, impact suffix) - 1 e2e auth-proxy spec in `tests/e2e/dashboard-salud.spec.ts` × 3 browsers + 6 unit helper tests = 6 new unit + 3 new e2e - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 524/524 ✓ playwright 35/35 chromium ✓ next build ✓
 - [ ] Batch 14 — Dashboard wire-up · 0/6 in batch · 0/100 overall
 - [ ] Batch 15 — Nightly cron stub · 0/6 in batch · 0/100 overall
 
