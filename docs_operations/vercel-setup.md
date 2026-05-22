@@ -27,8 +27,21 @@ Vercel has three environment scopes: **Production**, **Preview**, and **Developm
 | `DIRECT_URL`                    | prod direct URL                                                                                    | prod direct URL         | prod or local direct URL                     |
 | `ANTHROPIC_API_KEY`             | real key                                                                                           | real key                | real key                                     |
 | `NEXT_PUBLIC_DEMO_MODE`         | `false`                                                                                            | `false`                 | `false`                                      |
+| `CRON_SECRET`                   | random 32+ char string                                                                             | same as production      | same as production (any value works locally) |
 
 **Important**: per locked **D-5**, there is a single Supabase project; `main` branch is production. Preview deploys read/write the **same** Supabase. This is acceptable for MVP with a solo builder and no live users; revisit when the first pilot onboards.
+
+### `CRON_SECRET` notes
+
+Shared-secret Bearer token consumed by three server-side endpoints — none of them user-facing:
+
+- `GET /api/cron/jobs` — manual ops drain for the `PendingJob` queue (kept after [ADR-001](./_DECISIONS.md#adr-001--no-cron-for-job-queue-draining-user-triggered-procesar-ahora-button-instead) removed the cron schedule)
+- `GET /api/cron/health-score` — manual ops drain for nightly Health Score recompute (kept after [ADR-002](./_DECISIONS.md#adr-002--no-vercel-cron-at-all-health-score-auto-recomputes-on-dashboard-visit-when-stale) removed the cron schedule)
+- `POST /api/admin/backfill-categorization?confirm=yes` — one-off backfill for transactions inserted before the auto-categorization wiring (B5)
+
+All three routes **fail-closed** when `CRON_SECRET` is unset — they return 401 rather than running unauthenticated. No scheduler currently fires them; they are curl-able from the operator's machine when needed (`curl -H "Authorization: Bearer $CRON_SECRET" https://app.example.com/api/cron/health-score`).
+
+Rotate on leak. After rotation, redeploy production so the new value is picked up by the route handlers (Vercel does this automatically on env-var change).
 
 ## 3. Configure the `ifa-demo` deployment (D-1.B)
 
