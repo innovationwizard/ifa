@@ -282,6 +282,33 @@
       "step3": "Nosotros lo leemos, lo ordenamos, y te mostramos qué está pasando con tu plata.",
       "cta": "Subir estado de cuenta",
       "privacyNote": "Tu información es solo tuya. No la compartimos con tu banco ni con nadie."
+    },
+    "home": {
+      "greeting": "Hola, {name}",
+      "subtitle": "Esto es lo que pasa con tu plata."
+    },
+    "score": {
+      "title": "Tu puntaje de salud",
+      "viewDetail": "Ver detalle",
+      "emptyBody": "Aún no calculamos tu puntaje. Vamos a verlo en un minuto.",
+      "emptyCta": "Calcular ahora"
+    },
+    "monthlySummary": {
+      "title": "Este mes",
+      "viewMore": "Ver más",
+      "income": "Ingresos",
+      "expense": "Gastos",
+      "net": "Neto"
+    },
+    "recentActivity": {
+      "title": "Últimos movimientos",
+      "viewAll": "Ver todos",
+      "empty": "Aún no hay movimientos este mes."
+    },
+    "quickLinks": {
+      "flow": "Flujo de dinero",
+      "spending": "Gastos por categoría",
+      "merchants": "Comercios"
     }
   },
   "modulePlaceholders": {
