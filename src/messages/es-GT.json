@@ -371,6 +371,17 @@
       "merchants": "Top comercios: {count} comercios, total {total}."
     }
   },
+  "healthScore": {
+    "tier": {
+      "critico": "Crítico",
+      "enRiesgo": "En riesgo",
+      "estable": "Estable",
+      "excelente": "Excelente"
+    },
+    "partial": "Faltan datos",
+    "previousLabel": "Mes pasado: {score}",
+    "ariaLabel": "Puntaje {score} de {max}, {tier}"
+  },
   "common": {
     "buttons": {
       "save": "Guardar",
