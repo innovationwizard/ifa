@@ -9,6 +9,7 @@ import { ImprovementList } from '@/components/health-score/improvement-list';
 import { getCurrentUser } from '@/lib/auth/server';
 import { healthScoreRepo, profileRepo } from '@/lib/db/repositories';
 import { withTenant } from '@/lib/db/tenant-context';
+import { maybeRecomputeStale } from '@/lib/intelligence/health-score/staleness';
 import { recomputeNow } from './actions';
 
 /**
@@ -75,13 +76,27 @@ export default async function HealthScoreDetailPage() {
   const profile = profiles[0];
   if (!profile) redirect('/bienvenida');
 
+  /*
+   * ADR-002: auto-recompute when the latest score is >24h stale and
+   * the throttle window has cleared. `maybeRecomputeStale` is a
+   * cheap no-op when either gate fails. We read the latest twice
+   * only on the slow path (recompute actually ran) so the cached-
+   * score path stays at a single round trip.
+   */
+  const initialLatest = await withTenant({ profileId: profile.id, userId: user.id }, () =>
+    healthScoreRepo.findLatestForProfile(),
+  );
+  const didRecompute = await maybeRecomputeStale({
+    profileId: profile.id,
+    latestScore: initialLatest,
+    lastRecomputeAt: profile.lastHealthScoreRecomputeAt,
+  });
+
   const { latest, history } = await withTenant(
     { profileId: profile.id, userId: user.id },
     async () => {
-      const [latestRow, historyRows] = await Promise.all([
-        healthScoreRepo.findLatestForProfile(),
-        healthScoreRepo.findHistoryForProfile({ limit: 30 }),
-      ]);
+      const latestRow = didRecompute ? await healthScoreRepo.findLatestForProfile() : initialLatest;
+      const historyRows = await healthScoreRepo.findHistoryForProfile({ limit: 30 });
       const actionRows = latestRow ? await healthScoreRepo.findActionsForScore(latestRow.id) : [];
       return {
         latest: latestRow ? { row: latestRow, actions: actionRows } : null,

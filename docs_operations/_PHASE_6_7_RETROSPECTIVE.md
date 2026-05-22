@@ -253,3 +253,11 @@ Numbered with the ADR they reference.
   anyway. Endpoint stays as a manual ops drain. See ADR-001 for
   the full reasoning + the JSONB-filtered claim variant
   (`jobQueue.claimForProfile`).
+- **ADR-002** ([\_DECISIONS.md](./_DECISIONS.md), 2026-05-22):
+  Removed B15's daily `/api/cron/health-score` Vercel Cron entry
+  too. Score auto-recomputes on dashboard visit when the cached
+  score is >24h stale AND the 1×/hour throttle has cleared.
+  `vercel.json`'s `crons` array is now removed entirely — the
+  codebase is Vercel-Cron-free. Owner's stated risk tolerance for
+  Vercel Cron reliability on free tier was zero. New helper module:
+  [staleness.ts](../src/lib/intelligence/health-score/staleness.ts).

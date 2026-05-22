@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getCurrentUser } from '@/lib/auth/server';
 import { healthScoreRepo, profileRepo, transactionRepo } from '@/lib/db/repositories';
 import { withTenant } from '@/lib/db/tenant-context';
+import { maybeRecomputeStale } from '@/lib/intelligence/health-score/staleness';
 import { monthlyCashFlow } from '@/lib/reports/aggregations';
 import { currentMonthInGuatemala } from '@/lib/reports/current-month';
 
@@ -53,36 +54,52 @@ export default async function DashboardPage() {
 
   const month = currentMonthInGuatemala();
 
-  const { transactionCount, latestScore, monthTransactions, recent } = await withTenant(
-    { profileId: profile.id, userId: user.id },
-    async () => {
-      const count = await transactionRepo.count();
-      if (count === 0) {
-        return {
-          transactionCount: 0,
-          latestScore: null,
-          monthTransactions: [],
-          recent: { data: [], hasMore: false, nextCursor: null },
-        };
-      }
-      const [latest, monthRows, recentRows] = await Promise.all([
-        healthScoreRepo.findLatestForProfile(),
-        transactionRepo.listAllForReports({ from: month.from, to: month.to }),
-        transactionRepo.list({ limit: 10 }),
-      ]);
+  const firstPass = await withTenant({ profileId: profile.id, userId: user.id }, async () => {
+    const count = await transactionRepo.count();
+    if (count === 0) {
       return {
-        transactionCount: count,
-        latestScore: latest,
-        monthTransactions: monthRows,
-        recent: recentRows,
+        transactionCount: 0,
+        latestScore: null,
+        monthTransactions: [],
+        recent: { data: [], hasMore: false, nextCursor: null },
       };
-    },
-  );
+    }
+    const [latest, monthRows, recentRows] = await Promise.all([
+      healthScoreRepo.findLatestForProfile(),
+      transactionRepo.listAllForReports({ from: month.from, to: month.to }),
+      transactionRepo.list({ limit: 10 }),
+    ]);
+    return {
+      transactionCount: count,
+      latestScore: latest,
+      monthTransactions: monthRows,
+      recent: recentRows,
+    };
+  });
 
-  if (transactionCount === 0) {
+  if (firstPass.transactionCount === 0) {
     const firstName = profile.displayName.split(/\s+/)[0] ?? profile.displayName;
     return <EmptyDashboard firstName={firstName} />;
   }
+
+  /*
+   * ADR-002: auto-recompute when the latest score is >24h stale and
+   * the throttle window has cleared. Re-read the score only when a
+   * recompute actually ran so the cached-score path keeps a single
+   * round trip.
+   */
+  const didRecompute = await maybeRecomputeStale({
+    profileId: profile.id,
+    latestScore: firstPass.latestScore,
+    lastRecomputeAt: profile.lastHealthScoreRecomputeAt,
+  });
+
+  const latestScore = didRecompute
+    ? await withTenant({ profileId: profile.id, userId: user.id }, () =>
+        healthScoreRepo.findLatestForProfile(),
+      )
+    : firstPass.latestScore;
+  const { monthTransactions, recent } = firstPass;
 
   const cashFlow = monthlyCashFlow(monthTransactions, { from: month.from, to: month.to });
   /*

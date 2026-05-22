@@ -110,3 +110,130 @@ purpose-specific endpoint for that job type, not a generic
 queue-drainer. The current ADR is about THIS queue's THIS
 traffic shape; it does not preclude a different queue with a
 different shape.
+
+---
+
+## ADR-002 — No Vercel Cron at all; Health Score auto-recomputes on dashboard visit when stale
+
+**Date:** 2026-05-22
+**Status:** Adopted, replacing the `/api/cron/health-score` daily Vercel
+Cron entry that shipped in
+[Phase 6/7 Batch 15](./_PHASE_6_7_PLAN.md#batch-15--nightly-cron-stub-railway-ready)
+(`f9eb7d6`, 2026-05-21).
+
+### Context
+
+B15 shipped a daily `0 8 * * *` Vercel Cron firing
+`GET /api/cron/health-score` to recompute every active profile's
+Health Score overnight. The design rationale was "user opens
+dashboard in the morning, sees a fresh score".
+
+The owner has had Vercel Cron fail reliably across previous
+projects. On free tier specifically:
+
+- No SLA — best-effort scheduling, no retry on failure
+- ~hours of log retention (failures age out before discovery)
+- Cron can be silently disabled if the project hits any usage limit
+- `CRON_SECRET` was never set in this project, so all cron
+  invocations would have 401'd anyway (separate finding from
+  ADR-001 prep)
+
+ADR-001 already removed the `/api/cron/jobs` schedule. This ADR
+removes the second and final cron entry, eliminating Vercel Cron
+as a dependency entirely.
+
+### Decision
+
+Remove the `/api/cron/health-score` cron entry from `vercel.json`.
+Replace its UX guarantee ("fresh score on first dashboard view of
+the day") with **synchronous auto-recompute inside the dashboard
+server components when the latest score is stale**.
+
+Concretely, both `/dashboard` (B14 widget) and `/dashboard/salud`
+(B13 detail page) check on every render:
+
+```
+if (latest score exists
+    AND latest.computedAt is older than STALENESS_THRESHOLD_MS (24h)
+    AND throttleRemainingMs(profile.lastHealthScoreRecomputeAt) === 0):
+  await recomputeHealthScore({ profileId, period: 'DAILY' })
+  stamp profile.lastHealthScoreRecomputeAt = now
+  re-read latest score for this render
+```
+
+The recompute is synchronous (awaited) so the page renders with the
+fresh score in the same response. Cost: 100–300ms added to the
+first dashboard load per ~24h cycle, invisible to the user (they're
+parsing the page anyway). Subsequent loads within the cycle hit
+the throttle short-circuit and use the cached row.
+
+### Reasoning
+
+- **No external scheduler = no external failure surface.** The score
+  freshness contract is enforced by the same request path that
+  renders the data. If the page renders, the score is fresh (or
+  the throttle prevented a recompute, which is itself fresh-by-
+  definition).
+- **Owner's risk tolerance for Vercel Cron is zero.** Stated
+  explicitly: "If it fails at least once, we are out definitely."
+  Per "production-first" + "don't assume", we cannot promise
+  Vercel Cron will fire reliably on free tier. The honest move is
+  to not depend on it.
+- **The throttle already exists** (B11's
+  `Profile.lastHealthScoreRecomputeAt` + 1×/hour window). Auto-
+  recompute reuses it for free — no new state, no new abstractions.
+- **The empty-state behavior stays.** A user with NO score yet
+  still sees the "Calcula tu primer puntaje" CTA from B13. Auto-
+  recompute only fires when a `latest` row already exists. First
+  recompute remains user-triggered (explicit consent to spend
+  AI tokens on a fresh-cold compute).
+- **Symmetric with ADR-001.** Both crons removed; both endpoints
+  kept as manual ops drains; both surfaces become user-triggered.
+  The codebase is now Vercel-Cron-free.
+
+### What stays in place
+
+- **`/api/cron/health-score/route.ts`** stays as a manual ops drain
+  (curl-able with `CRON_SECRET`). 4 unit + 9 e2e tests untouched.
+  Same shape as `/api/cron/jobs` after ADR-001.
+- **`cron-runner.ts` + `runHealthScoreCron`** stay — they're the
+  implementation the manual drain calls. Per-profile isolation +
+  Railway-migration header remain valid; just no longer fired by
+  Vercel Cron.
+- **B11's recompute API + throttle** unchanged.
+- **B13's "Calcular ahora" button** unchanged — explicit refresh
+  still works.
+
+### Consequences
+
+- New helper `src/lib/intelligence/health-score/staleness.ts`:
+  `isStale(score, now)`, `canAutoRecompute(lastRecomputeAt, now)`,
+  `maybeRecomputeStale(...)`. All pure where possible.
+- `/dashboard/salud` server component adds one branch: if stale +
+  throttle allows, await recompute then re-read latest.
+- `/dashboard` server component does the same so the widget
+  surfaces fresh data without requiring the user to navigate to
+  the detail page first.
+- `vercel.json` now has `"crons": []` (or the key removed
+  entirely). No scheduled invocations at all.
+- The 1×/hour throttle becomes the upper bound on auto-recompute
+  cost: at most 24 recomputes per profile per day even if 24
+  different users hit the dashboard at 24 different hours.
+  Realistic upper bound at MVP scale: ~1 recompute per active
+  user per day.
+
+### Reversal trigger
+
+If we ever need scheduled work that CANNOT be lazily triggered
+(e.g., emailed digests with "your weekly score" — the user must
+not need to log in for the email to send), reintroduce a
+scheduler at that point. The two candidates would be:
+
+1. **External scheduler hitting the existing HTTP endpoint**
+   (Railway cron, GitHub Actions, EasyCron, etc.) — same
+   endpoint, same auth, just not Vercel Cron.
+2. **Reintroduce Vercel Cron** only if the project has moved to
+   Pro and the owner re-evaluates risk tolerance.
+
+This ADR does not preclude either path. It just removes Vercel
+Cron from the MVP critical path.
