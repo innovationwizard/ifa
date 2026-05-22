@@ -4,6 +4,11 @@
 > a future contributor (or a compacted Claude conversation) can pick up
 > any batch from cold context — no chat history required. Each batch has
 > goal, files, acceptance criteria, dependencies, and risk notes.
+>
+> **Companion research:** [\_DATAVIZ_BEST_PRACTICES.md](./_DATAVIZ_BEST_PRACTICES.md)
+> — sourced design + tech-stack rationale that drove the bullet-graph
+> (not gauge) decision in Batch 12 and the `<Money>`/es-GT format
+> requirement in Batch 7.
 
 ## 0. Locked decisions (from the 2026-04-22 planning turn)
 
@@ -84,7 +89,7 @@ a 0–100 sub-score; weighted sum × 10 = final.
 | 5   | Recurring Spending Ratio | 15%    | Last 3 months expenses + merchant aggregation  | `recurring_txn_count / total_txn_count × 100` — recurring = same merchant ≥3 times in window           |
 | 6   | Anomaly Rate             | 10%    | Last 3 months, with anomaly flags from Batch 8 | `100 − min(100, anomaly_count / total_txn_count × 1000)` — 10% anomalies = 0 score                     |
 
-**Tier bands** (used for color coding in the gauge UI):
+**Tier bands** (used for color coding wherever the score is rendered — bullet graph in Batch 12, sparklines, dashboard cards):
 
 - `0–399` Crítico (red, `--color-ifa-error`)
 - `400–599` En riesgo (gold, `--color-ifa-gold-500`)
@@ -472,8 +477,14 @@ a server component using Batch 6 primitives + Recharts visualization.
 - [ ] Each report has URL-synced period (defaults: last 6 months)
 - [ ] Empty period shows "Sin datos para este periodo" — never a
       blank chart
-- [ ] Negative amounts (expenses) render with the IFA accounting
-      convention (parentheses) via the existing `<Money>` primitive
+- [ ] All currency rendering goes through the `<Money>` primitive
+      ([src/components/primitives/money.tsx](../src/components/primitives/money.tsx)),
+      not ad-hoc string formatting. Verify the output conforms to the
+      Banco de Guatemala convention surfaced in research:
+      `Q1,234.56` — `Q` prefix, no space, comma thousands, period decimal
+      (see [\_DATAVIZ_BEST_PRACTICES.md §3](./_DATAVIZ_BEST_PRACTICES.md)).
+      Negative amounts render in Latin-American accounting convention
+      (parentheses); the primitive already does this
 - [ ] Categories without an AI label group into "Sin categoría" so
       the user sees real counts during the categorization rollout
 - [ ] All copy in tú register, lower-elementary Spanish
@@ -651,43 +662,75 @@ end-to-end test).
 
 ---
 
-### Batch 12 — Gauge UI component
+### Batch 12 — Bullet graph UI component
 
-**Goal:** Reusable `<HealthScoreGauge>` component. Recharts
-RadialBarChart, animated, color-zone-aware.
+**Goal:** Reusable `<HealthScoreBullet>` component. Linear (not
+radial) bullet graph encoding actual score + qualitative tier bands
+
+- previous-month comparison tick, per Stephen Few's design spec.
+  Replaces the originally-planned radial gauge — gauges are
+  documented anti-patterns for scored values (space-inefficient, fail
+  at comparison). See
+  [\_DATAVIZ_BEST_PRACTICES.md §1.3 + §1.5 + §2](./_DATAVIZ_BEST_PRACTICES.md)
+  for the research that drove this change.
+
+Hand-rolled SVG (≈80 lines). No Recharts dependency for this
+component — Recharts' radial primitives aren't a fit, and a custom
+linear track is simpler than fighting the lib.
 
 **Files:**
 
-- `src/components/health-score/gauge.tsx` — props: `{ score,
-previousScore?, partial? }`; renders gauge with tier band color
+- `src/components/health-score/bullet.tsx` — props: `{ score,
+previousScore?, partial? }`; renders a horizontal track with the
+  four tier bands as background, the actual score as a vertical
+  marker, and the previous-month score (when provided) as a small
+  tick above the track
 - `src/components/health-score/tier.ts` — `scoreTier(score)` →
   `'critico' | 'enRiesgo' | 'estable' | 'excelente'` + color
-  constant
+  constant per tier (red / amber / teal / deep-teal)
 - `src/components/health-score/tier.test.ts` — boundary tests
-  (399→crítico, 400→enRiesgo, 599→enRiesgo, 600→estable, 799→
-  estable, 800→excelente)
-- `src/components/health-score/gauge.test.tsx` — RTL snapshot of
-  the rendered SVG structure (verifies color + numeric value)
+  (399→crítico, 400→enRiesgo, 599→enRiesgo, 600→estable,
+  799→estable, 800→excelente)
+- `src/components/health-score/bullet.test.tsx` — RTL snapshot of
+  the rendered SVG structure: tier-band rects, score marker
+  position, previous-period tick position, aria-label text
 
-**Acceptance criteria (7 items):**
+**Acceptance criteria (8 items):**
 
-- [ ] Gauge renders a numeric score + tier label inside the arc
-- [ ] Trend arrow shown when `previousScore` is set (up = teal,
-      down = warning gold; never red — accessibility)
+- [ ] Horizontal track 0–1000 with four tier bands as background
+      fills (Crítico red, En riesgo amber, Estable teal, Excelente
+      deep teal — see [\_DATAVIZ_BEST_PRACTICES.md §1.3](./_DATAVIZ_BEST_PRACTICES.md))
+- [ ] Actual score rendered as a vertical marker over the bands,
+      with the numeric value + Spanish tier label adjacent (never
+      relies on color alone — WCAG SC 1.4.1)
+- [ ] `previousScore` (when set) renders as a smaller tick above
+      the track at its position, with a hairline connecting it to
+      the actual-score marker (the "comparación" cue from §1.5)
 - [ ] `partial: true` shows a "Faltan datos" pill instead of the
-      trend arrow
-- [ ] aria-label includes the score + tier in Spanish so screen
-      readers don't rely on color
-- [ ] 600ms animation on mount; respects `prefers-reduced-motion`
+      previous-period tick
+- [ ] aria-label includes the score + tier in Spanish ("Puntaje 720
+      de 1000, Estable") so screen readers don't rely on visual
+      encoding
+- [ ] 600ms animation on the marker position only; respects
+      `prefers-reduced-motion`
 - [ ] All six tier boundaries unit-tested
 - [ ] Full gate sweep green
+
+**Risk notes:**
+
+- The originally-planned `<HealthScoreGauge>` semicircle survives
+  in the demo kit ([demo/src/components/demo/financial-overview.tsx](../demo/src/components/demo/financial-overview.tsx))
+  for the panic-mode emergency path; it is NOT updated here because
+  the kit is a frozen snapshot. When the kit is next refreshed,
+  the gauge should be replaced with this bullet component too.
 
 ---
 
 ### Batch 13 — Score detail page
 
-**Goal:** `/dashboard/salud` — full Health Score view with gauge,
-factor radar, history line chart, improvement actions.
+**Goal:** `/dashboard/salud` — full Health Score view with the
+bullet graph (Batch 12), factor radar, history line chart, and
+improvement actions.
 
 **Files:**
 
@@ -706,8 +749,8 @@ factor radar, history line chart, improvement actions.
 
 **Acceptance criteria (8 items):**
 
-- [ ] Page renders gauge + radar + history + actions vertically on
-      mobile, two-column on desktop
+- [ ] Page renders bullet graph + radar + history + actions
+      vertically on mobile, two-column on desktop
 - [ ] Radar chart axes are translated factor names (not technical
       keys)
 - [ ] Clicking a factor on the radar reveals its formula + current
@@ -725,16 +768,17 @@ factor radar, history line chart, improvement actions.
 ### Batch 14 — Dashboard wire-up
 
 **Goal:** Replace the dashboard placeholder with the real MVP view
-for users with transactions: gauge widget + recent-activity list +
-monthly summary widget + quick links to reports.
+for users with transactions: Health Score bullet-graph widget +
+recent-activity list + monthly summary widget + quick links to
+reports.
 
 **Files:**
 
 - `src/app/(app)/dashboard/page.tsx` — branch: zero transactions →
   S-2.9 empty state (already shipped); non-zero → render the new
   dashboard
-- `src/components/dashboard/score-widget.tsx` — wraps `<HealthScoreGauge>`
-  with a link to `/dashboard/salud`
+- `src/components/dashboard/score-widget.tsx` — wraps `<HealthScoreBullet>`
+  (Batch 12) with a link to `/dashboard/salud`
 - `src/components/dashboard/monthly-summary.tsx` — current-month
   income/expense/net using `monthlyCashFlow` from Batch 6
 - `src/components/dashboard/recent-activity.tsx` — last 10
@@ -745,9 +789,10 @@ monthly summary widget + quick links to reports.
 
 - [ ] Zero-transaction users still see the S-2.9 empty state
       unchanged
-- [ ] Non-zero users see gauge prominently above the fold
-- [ ] No score yet → gauge shows "Sube tu primer estado de cuenta"
-      empty state with a "Calcular ahora" button
+- [ ] Non-zero users see the Health Score bullet graph prominently
+      above the fold
+- [ ] No score yet → bullet graph shows "Sube tu primer estado de
+      cuenta" empty state with a "Calcular ahora" button
 - [ ] Monthly summary respects the current-month boundary in
       `America/Guatemala`
 - [ ] Recent-activity rows match the feed's row style for
@@ -812,18 +857,25 @@ durationMs }`
 | 9 Factor library               | 8                               |
 | 10 Engine + persistence        | 7                               |
 | 11 Recompute API + history API | 7                               |
-| 12 Gauge UI                    | 7                               |
+| 12 Bullet graph UI             | 8                               |
 | 13 Score detail page           | 8                               |
 | 14 Dashboard wire-up           | 6                               |
 | 15 Nightly cron                | 6                               |
-| **Total**                      | **100 items across 15 batches** |
+| **Total**                      | **101 items across 15 batches** |
 
 ## 6. Progress log
 
-Format: `[checkbox] Batch N — Name · X/Y in batch · A/100 overall · commit <sha> · YYYY-MM-DD`.
-Update this list at the end of every batch before the commit. The commit
-that closes a batch MUST include this file's updated progress log so
-state is recoverable from `git log -p docs/_PHASE_6_7_PLAN.md`.
+Format: `[checkbox] Batch N — Name · X/Y in batch · A/101 overall · commit <sha> · YYYY-MM-DD`.
+
+> Total rose from 100 → 101 on 2026-05-21 when Batch 12 was retitled
+> "Bullet graph UI component" with 8 acceptance items (vs the original
+> gauge plan's 7). Historical entries below keep their `/100` denominator
+> as a snapshot of what the plan was at that commit. New entries should
+> use `/101`. See [\_DATAVIZ_BEST_PRACTICES.md §7](./_DATAVIZ_BEST_PRACTICES.md)
+> for the change rationale.
+> Update this list at the end of every batch before the commit. The commit
+> that closes a batch MUST include this file's updated progress log so
+> state is recoverable from `git log -p docs/_PHASE_6_7_PLAN.md`.
 
 - [x] Batch 1 — Schema additions · 5/5 in batch · 5/100 overall · commit `<pending>` · 2026-04-22 - schema validated (`pnpm db:format`) - `db:push --accept-data-loss` applied to Supabase prod, diff was purely additive (3 enums + 2 tables + 4 indexes; no DROP, no ALTER COLUMN) - `db:generate` refreshed client - `MerchantCategory` added to `TENANT_SCOPED_MODELS` in `src/lib/db/tenancy.ts` - smoke count: `{ merchantCategories: 0, pendingJobs: 0 }` — tables reachable - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 242/242 ✓ playwright 60/60 ✓ next build ✓
 - [x] Batch 2 — Anthropic client wrapper · 6/6 in batch · 11/100 overall · commit `<pending>` · 2026-05-21 - `@anthropic-ai/sdk@0.97.1` installed - `src/lib/ai/claude.ts` exports `MODEL_OPUS='claude-opus-4-7'`, `MODEL_HAIKU='claude-haiku-4-5-20251001'`, singleton `getClaudeClient()` (lazy env read, `maxRetries: 0` so our loop owns retries), `callClaudeWithRetry()` with 3-retry exponential backoff (200/800/3200 ms) on 5xx + 429, structured cost telemetry that emits only `{event, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, latencyMs}` — never prompt/response content - `_resetClaudeClientForTesting()` test seam - `src/lib/ai/claude.test.ts` covers 10 paths: model constants, first-attempt success, telemetry shape + privacy invariant (no `ping`/`"ok"` in log line), cache-counter defaults, 500→retry, 429→retry, exhaust 3 retries→rethrow APIError, no-retry on 400, no-retry on non-APIError, singleton identity - vitest mock of `@/lib/env` for module-load env throw; `@vitest-environment node` directive for SDK's browser guard - gate sweep: lint ✓ typecheck ✓ prettier ✓ vitest 252/252 ✓ playwright 60/60 ✓ next build ✓
@@ -836,7 +888,7 @@ state is recoverable from `git log -p docs/_PHASE_6_7_PLAN.md`.
 - [ ] Batch 9 — Health Score factor library · 0/8 in batch · 0/100 overall
 - [ ] Batch 10 — Health Score engine + persistence · 0/7 in batch · 0/100 overall
 - [ ] Batch 11 — Recompute API + history API · 0/7 in batch · 0/100 overall
-- [ ] Batch 12 — Gauge UI component · 0/7 in batch · 0/100 overall
+- [ ] Batch 12 — Bullet graph UI component · 0/8 in batch · 0/100 overall
 - [ ] Batch 13 — Score detail page · 0/8 in batch · 0/100 overall
 - [ ] Batch 14 — Dashboard wire-up · 0/6 in batch · 0/100 overall
 - [ ] Batch 15 — Nightly cron stub · 0/6 in batch · 0/100 overall
