@@ -177,6 +177,14 @@ model Profile {
   /// promo code on first checkout during the early-adopter window.
   earlySupporterSince  DateTime?
 
+  // --- Health Score throttle (Phase 6/7 Batch 11) ---------------------
+  /// Wall-clock of the last successful `POST /api/v1/intelligence/
+  /// health-score` recompute. Used to rate-limit user-triggered
+  /// recomputes to 1× per hour per profile. Null = never recomputed
+  /// (first computation is unrestricted). Single additive column —
+  /// avoids JSONB juggling in `metadata`.
+  lastHealthScoreRecomputeAt DateTime?
+
   members ProfileMember[]
 
   @@index([type])
