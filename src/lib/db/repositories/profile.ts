@@ -42,6 +42,30 @@ export const profileRepo = {
   },
 
   /**
+   * Iterate-able list of profile ids the nightly Health Score cron
+   * should recompute for (Phase 6/7 Batch 15). Excludes `EXPIRED`
+   * subscriptions — those users have no UI access, so refreshing
+   * their score wastes compute without user benefit. Everyone else
+   * (TRIAL / ACTIVE / EARLY_SUPPORTER / PAST_DUE / CANCELED) keeps
+   * a fresh score even during grace periods so the dashboard is
+   * accurate the moment a billing recovery flips them back to
+   * ACTIVE.
+   *
+   * Returns ids only (not full Profile rows) so the cron's memory
+   * footprint stays constant regardless of tenant count. Ordering
+   * by `createdAt` is deterministic — useful for the per-profile
+   * isolation log when a recompute fails mid-batch.
+   */
+  async listActiveProfileIds(): Promise<string[]> {
+    const rows = await prisma.profile.findMany({
+      where: { subscriptionStatus: { not: 'EXPIRED' } },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((r) => r.id);
+  },
+
+  /**
    * First-sign-in bootstrap. Creates the Profile row (INDIVIDUAL by
    * default, with `trialEndsAt = now + 30d`) and the OWNER
    * ProfileMember row in a single transaction so there's never a
