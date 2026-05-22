@@ -116,11 +116,18 @@ export default tseslint.config(
    * rather than being convention only. Direct imports of `@/lib/db/prisma`
    * are banned outside:
    *   - src/lib/db/**     : the client itself, extensions, repositories
+   *   - src/lib/jobs/**   : the background-job queue (Phase 6/7 Batch 4).
+   *                         The queue runs raw `SELECT ... FOR UPDATE
+   *                         SKIP LOCKED` against the connection pool and
+   *                         operates on the non-tenant `pending_jobs`
+   *                         table — neither fits the typed-repo pattern
+   *                         nor needs tenancy injection. Treated as
+   *                         DB-adjacent infrastructure.
    *   - prisma/**         : seeds and migration scripts
    */
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/lib/db/**'],
+    ignores: ['src/lib/db/**', 'src/lib/jobs/**'],
     rules: {
       'no-restricted-imports': [
         'error',
