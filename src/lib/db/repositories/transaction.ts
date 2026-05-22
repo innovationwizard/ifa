@@ -448,6 +448,27 @@ export const transactionRepo = {
   },
 
   /**
+   * Bulk fetch for the Phase 6 reports UI. Returns EVERY transaction
+   * in the [from, to] range — no cursor pagination — because the
+   * report aggregations (`monthlyCashFlow`, `spendingByCategory`,
+   * `topMerchants`) compute over the full set in memory.
+   *
+   * Cost shape: a 3-month range for an individual tier sits in the
+   * low-hundreds of rows (one CSV import per month). Keep an eye
+   * on this when BUSINESS-tier multi-year reports land — at 10k+
+   * rows we'll want server-side aggregation (GROUP BY) instead.
+   *
+   * Tenant-scoped: callers MUST be inside `withTenant(...)`. The
+   * extension injects `where: { profileId }` automatically.
+   */
+  listAllForReports(args: { from: Date; to: Date }): Promise<Transaction[]> {
+    return prisma.transaction.findMany({
+      where: { date: { gte: args.from, lte: args.to } },
+      orderBy: { date: 'asc' },
+    });
+  },
+
+  /**
    * Cursor-paginated list with optional filters.
    *
    * Ordering: `date DESC, id DESC`. UUIDv7 ids are time-ordered so the
