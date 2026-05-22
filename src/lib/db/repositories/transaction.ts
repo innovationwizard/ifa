@@ -313,12 +313,21 @@ export const transactionRepo = {
        * it up.
        */
       try {
-        await jobQueue.enqueueMany(
-          inserted.map((row) => ({
-            type: 'CATEGORIZE_TRANSACTION',
+        /*
+         * Two jobs per inserted row, enqueued as a single createMany
+         * (round-trip cost = 1 even at 500 rows × 2 = 1000 jobs).
+         * Order is irrelevant: the handlers are independent.
+         */
+        await jobQueue.enqueueMany([
+          ...inserted.map((row) => ({
+            type: 'CATEGORIZE_TRANSACTION' as const,
             payload: { transactionId: row.id, profileId },
           })),
-        );
+          ...inserted.map((row) => ({
+            type: 'DETECT_ANOMALY' as const,
+            payload: { transactionId: row.id, profileId },
+          })),
+        ]);
       } catch (err) {
         console.warn(
           `[transaction] enqueueMany failed after import of ${String(inserted.length)} rows`,
@@ -412,22 +421,34 @@ export const transactionRepo = {
         return created;
       });
       /*
-       * Phase 6/7 Batch 5: enqueue exactly one categorization job
-       * for the fresh insert. Skipped when the caller supplied a
-       * `category` directly (manual classification — no need to
-       * spend a Claude call). Non-fatal: the Transaction is
-       * already committed; an enqueue failure means the row stays
-       * uncategorized until the admin backfill picks it up.
+       * Phase 6/7 Batches 5 + 8: enqueue background jobs for the
+       * fresh insert. Bundled into a single round-trip via
+       * `enqueueMany`. Non-fatal: the Transaction is already
+       * committed; an enqueue failure means the row stays
+       * unflagged/uncategorized until the admin backfill picks
+       * it up.
+       *
+       *   - CATEGORIZE_TRANSACTION: skipped when the caller
+       *     supplied `category` directly (no need to spend a
+       *     Claude call on a manually-classified row).
+       *   - DETECT_ANOMALY: always enqueued — the handler itself
+       *     filters to EXPENSE rows internally, so an INCOME or
+       *     TRANSFER insert no-ops at handler time. Cheaper than
+       *     branching here.
        */
+      const jobs: Parameters<typeof jobQueue.enqueueMany>[0] = [
+        { type: 'DETECT_ANOMALY', payload: { transactionId: transaction.id, profileId } },
+      ];
       if (!input.category) {
-        try {
-          await jobQueue.enqueue({
-            type: 'CATEGORIZE_TRANSACTION',
-            payload: { transactionId: transaction.id, profileId },
-          });
-        } catch (err) {
-          console.warn(`[transaction] categorization enqueue failed for ${transaction.id}`, err);
-        }
+        jobs.unshift({
+          type: 'CATEGORIZE_TRANSACTION',
+          payload: { transactionId: transaction.id, profileId },
+        });
+      }
+      try {
+        await jobQueue.enqueueMany(jobs);
+      } catch (err) {
+        console.warn(`[transaction] job enqueue failed for ${transaction.id}`, err);
       }
 
       return { created: true, transaction };

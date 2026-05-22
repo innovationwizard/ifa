@@ -1,6 +1,7 @@
 import 'server-only';
 import type { JobType, Prisma } from '@prisma/client';
 import { categorizeTransactionHandler } from './categorize-transaction';
+import { detectAnomalyHandler } from './detect-anomaly';
 
 /**
  * Job-type → handler dispatch table (Phase 6/7 Batch 4).
@@ -13,14 +14,9 @@ import { categorizeTransactionHandler } from './categorize-transaction';
  *   - throwing on failure so the caller can `markFailed` and the
  *     queue's retry/dead-letter logic kicks in
  *
- * Real implementations land in their owning batches:
- *   - CATEGORIZE_TRANSACTION → Batch 5 (categorization auto-trigger)
- *   - DETECT_ANOMALY        → Batch 8 (anomaly detection)
- *
- * Until then the stubs below log and resolve — exercising the queue
- * end-to-end without doing real work. Stubs deliberately succeed so
- * dead-letter behavior isn't masked during development of the queue
- * itself.
+ * Currently wired:
+ *   - CATEGORIZE_TRANSACTION → ./categorize-transaction (Batch 5)
+ *   - DETECT_ANOMALY        → ./detect-anomaly         (Batch 8)
  */
 
 export type JobHandler = (payload: Prisma.JsonValue) => Promise<void>;
@@ -28,15 +24,7 @@ export type JobHandler = (payload: Prisma.JsonValue) => Promise<void>;
 const handlers: Record<JobType, JobHandler> = {
   CATEGORIZE_TRANSACTION: categorizeTransactionHandler,
 
-  DETECT_ANOMALY: (payload: Prisma.JsonValue) => {
-    /*
-     * Stub — Batch 8 replaces this with the anomaly-detection
-     * handler that scores a transaction against the user's
-     * historical pattern and writes a flag if it qualifies.
-     */
-    console.warn('[jobs] DETECT_ANOMALY stub — Batch 8 will implement', { payload });
-    return Promise.resolve();
-  },
+  DETECT_ANOMALY: detectAnomalyHandler,
 };
 
 /**
