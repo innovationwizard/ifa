@@ -45,3 +45,10 @@ export type {
 
 export { merchantCategoryRepo } from './merchant-category';
 export type { MerchantCategoryRepo } from './merchant-category';
+
+export { healthScoreRepo } from './health-score';
+export type {
+  CreateHealthScoreInput,
+  CreateHealthScoreResult,
+  HealthScoreRepo,
+} from './health-score';
