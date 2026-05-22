@@ -79,6 +79,28 @@ export const jobQueue = {
   },
 
   /**
+   * Bulk-insert variant of `enqueue`. Single round-trip via
+   * `createMany` so a 500-row CSV import doesn't pay N enqueue
+   * latencies. Returns the count actually inserted.
+   *
+   * No idempotency at this layer — callers that need
+   * "don't enqueue twice for the same transaction" should track
+   * that themselves (the categorize-transaction handler is
+   * idempotent anyway, so duplicates are safe but wasteful).
+   */
+  async enqueueMany(rows: EnqueueArgs[]): Promise<{ inserted: number }> {
+    if (rows.length === 0) return { inserted: 0 };
+    const result = await prismaUnscoped.pendingJob.createMany({
+      data: rows.map((args) => ({
+        type: args.type,
+        payload: args.payload,
+        ...(args.scheduledAt ? { scheduledAt: args.scheduledAt } : {}),
+      })),
+    });
+    return { inserted: result.count };
+  },
+
+  /**
    * Atomically claim up to `limit` PENDING jobs whose `scheduledAt`
    * has passed. Each claimed row is flipped to RUNNING with
    * `lockedBy = workerId` and `lockedAt = NOW()`. Returns the rows

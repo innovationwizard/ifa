@@ -115,19 +115,25 @@ export default tseslint.config(
    * contracts (e.g., AuditLog immutability) are enforced at the type level
    * rather than being convention only. Direct imports of `@/lib/db/prisma`
    * are banned outside:
-   *   - src/lib/db/**     : the client itself, extensions, repositories
-   *   - src/lib/jobs/**   : the background-job queue (Phase 6/7 Batch 4).
-   *                         The queue runs raw `SELECT ... FOR UPDATE
-   *                         SKIP LOCKED` against the connection pool and
-   *                         operates on the non-tenant `pending_jobs`
-   *                         table — neither fits the typed-repo pattern
-   *                         nor needs tenancy injection. Treated as
-   *                         DB-adjacent infrastructure.
-   *   - prisma/**         : seeds and migration scripts
+   *   - src/lib/db/**         : the client itself, extensions, repositories
+   *   - src/lib/jobs/**       : the background-job queue (Phase 6/7
+   *                             Batch 4). The queue runs raw `SELECT ...
+   *                             FOR UPDATE SKIP LOCKED` against the
+   *                             connection pool and operates on the
+   *                             non-tenant `pending_jobs` table — neither
+   *                             fits the typed-repo pattern nor needs
+   *                             tenancy injection.
+   *   - src/app/api/admin/**  : operator-only admin endpoints (Phase 6/7
+   *                             Batch 5+). These read across tenants by
+   *                             design (backfill, reaper, etc.); routing
+   *                             them through the repo would force the
+   *                             repo to expose unsafe cross-tenant
+   *                             methods. Auth-gated by CRON_SECRET.
+   *   - prisma/**             : seeds and migration scripts
    */
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/lib/db/**', 'src/lib/jobs/**'],
+    ignores: ['src/lib/db/**', 'src/lib/jobs/**', 'src/app/api/admin/**'],
     rules: {
       'no-restricted-imports': [
         'error',

@@ -169,14 +169,18 @@ describe('categorizeMerchant', () => {
     warnSpy.mockRestore();
   });
 
-  it('cache hit — returns cached category without calling Claude', async () => {
+  it('cache hit — returns cached category + cached confidence without calling Claude', async () => {
     findByLookupKey.mockResolvedValue(
-      fakeCacheRow({ category: 'Alimentación', lookupKey: 'name:walmart' }),
+      fakeCacheRow({
+        category: 'Alimentación',
+        aiConfidence: 0.92,
+        lookupKey: 'name:walmart',
+      }),
     );
 
     const result = await categorizeMerchant(PROFILE_ID, { merchantName: 'Walmart' });
 
-    expect(result).toBe('Alimentación');
+    expect(result).toEqual({ category: 'Alimentación', confidence: 0.92 });
     expect(findByLookupKey).toHaveBeenCalledTimes(1);
     expect(findByLookupKey).toHaveBeenCalledWith('name:walmart');
     expect(callClaudeMock).not.toHaveBeenCalled();
@@ -200,7 +204,7 @@ describe('categorizeMerchant', () => {
       merchantName: 'Pollo Campero',
     });
 
-    expect(result).toBe('Restaurantes');
+    expect(result).toEqual({ category: 'Restaurantes', confidence: 0.91 });
     expect(callClaudeMock).toHaveBeenCalledTimes(1);
 
     /*
@@ -302,7 +306,7 @@ describe('categorizeMerchant', () => {
 
     const result = await categorizeMerchant(PROFILE_ID, { merchantName: 'EEGSA' });
 
-    expect(result).toBe('Servicios');
+    expect(result).toEqual({ category: 'Servicios', confidence: 0.92 });
     expect(findByLookupKey).toHaveBeenCalledTimes(2);
   });
 });

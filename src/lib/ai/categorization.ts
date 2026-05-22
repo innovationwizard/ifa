@@ -203,17 +203,30 @@ async function askClaudeForCategory(merchant: MerchantInput): Promise<CategoryRe
   };
 }
 
+/**
+ * Result of a successful categorization. `confidence` is the AI's
+ * self-reported score in [0, 1] for AI-sourced rows, and `null` for
+ * USER overrides (USER rows are deterministic; confidence doesn't
+ * apply). The caller (e.g. the categorize-transaction job handler in
+ * Batch 5) writes both to `Transaction.category` and
+ * `Transaction.aiCategoryConfidence`.
+ */
+export interface CategorizationResult {
+  category: Category;
+  confidence: number | null;
+}
+
 export async function categorizeMerchant(
   profileId: string,
   merchant: MerchantInput,
-): Promise<Category | null> {
+): Promise<CategorizationResult | null> {
   const lookupKey = normalizeLookupKey(merchant);
   if (!lookupKey) return null;
 
   return withTenant({ profileId, userId: null }, async () => {
     const cached = await merchantCategoryRepo.findByLookupKey(lookupKey);
     if (cached && isCategory(cached.category)) {
-      return cached.category;
+      return { category: cached.category, confidence: cached.aiConfidence };
     }
 
     const ai = await askClaudeForCategory(merchant);
@@ -237,10 +250,12 @@ export async function categorizeMerchant(
        * a possible USER override.
        */
       const concurrent = await merchantCategoryRepo.findByLookupKey(lookupKey);
-      if (concurrent && isCategory(concurrent.category)) return concurrent.category;
+      if (concurrent && isCategory(concurrent.category)) {
+        return { category: concurrent.category, confidence: concurrent.aiConfidence };
+      }
       throw err;
     }
 
-    return ai.category;
+    return { category: ai.category, confidence: ai.confidence };
   });
 }

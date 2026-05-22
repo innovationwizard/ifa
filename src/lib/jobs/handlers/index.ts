@@ -1,5 +1,6 @@
 import 'server-only';
 import type { JobType, Prisma } from '@prisma/client';
+import { categorizeTransactionHandler } from './categorize-transaction';
 
 /**
  * Job-type → handler dispatch table (Phase 6/7 Batch 4).
@@ -25,16 +26,7 @@ import type { JobType, Prisma } from '@prisma/client';
 export type JobHandler = (payload: Prisma.JsonValue) => Promise<void>;
 
 const handlers: Record<JobType, JobHandler> = {
-  CATEGORIZE_TRANSACTION: (payload: Prisma.JsonValue) => {
-    /*
-     * Stub — Batch 5 replaces this with a handler that reads
-     * `transactionId` from payload, calls `categorizeMerchant`, and
-     * writes the result to Transaction.category +
-     * aiCategoryConfidence.
-     */
-    console.warn('[jobs] CATEGORIZE_TRANSACTION stub — Batch 5 will implement', { payload });
-    return Promise.resolve();
-  },
+  CATEGORIZE_TRANSACTION: categorizeTransactionHandler,
 
   DETECT_ANOMALY: (payload: Prisma.JsonValue) => {
     /*

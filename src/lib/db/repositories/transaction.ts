@@ -7,6 +7,7 @@ import type {
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { requireTenant } from '../tenant-context';
+import { jobQueue } from '@/lib/jobs/queue';
 
 /**
  * Transaction repository.
@@ -276,7 +277,13 @@ export const transactionRepo = {
    */
   async createManyFromImport(rows: ImportRow[]): Promise<{ inserted: number }> {
     const { profileId } = requireTenant('Transaction', 'createManyFromImport');
-    const result = await prisma.transaction.createMany({
+    /*
+     * Use `createManyAndReturn` (vs. `createMany`) so we get back the
+     * actually-inserted rows — `skipDuplicates: true` may drop some,
+     * and we only want to enqueue a categorization job for the rows
+     * that actually landed.
+     */
+    const inserted = await prisma.transaction.createManyAndReturn({
       data: rows.map((row) => ({
         profileId,
         source: 'BANK_CSV',
@@ -291,8 +298,36 @@ export const transactionRepo = {
         ...(row.metadata !== undefined ? { metadata: row.metadata } : {}),
       })),
       skipDuplicates: true,
+      select: { id: true },
     });
-    return { inserted: result.count };
+
+    if (inserted.length > 0) {
+      /*
+       * Phase 6/7 Batch 5: enqueue a categorization job per
+       * inserted row. The handler runs in its own withTenant
+       * context (constructed from the payload), looks up the
+       * MerchantCategory cache, and falls through to Claude Haiku
+       * on miss. Failures are non-fatal here — the import is
+       * already committed; an unsuccessful enqueue means the row
+       * stays uncategorized until the admin backfill route picks
+       * it up.
+       */
+      try {
+        await jobQueue.enqueueMany(
+          inserted.map((row) => ({
+            type: 'CATEGORIZE_TRANSACTION',
+            payload: { transactionId: row.id, profileId },
+          })),
+        );
+      } catch (err) {
+        console.warn(
+          `[transaction] enqueueMany failed after import of ${String(inserted.length)} rows`,
+          err,
+        );
+      }
+    }
+
+    return { inserted: inserted.length };
   },
 
   /**
@@ -376,6 +411,25 @@ export const transactionRepo = {
         });
         return created;
       });
+      /*
+       * Phase 6/7 Batch 5: enqueue exactly one categorization job
+       * for the fresh insert. Skipped when the caller supplied a
+       * `category` directly (manual classification — no need to
+       * spend a Claude call). Non-fatal: the Transaction is
+       * already committed; an enqueue failure means the row stays
+       * uncategorized until the admin backfill picks it up.
+       */
+      if (!input.category) {
+        try {
+          await jobQueue.enqueue({
+            type: 'CATEGORIZE_TRANSACTION',
+            payload: { transactionId: transaction.id, profileId },
+          });
+        } catch (err) {
+          console.warn(`[transaction] categorization enqueue failed for ${transaction.id}`, err);
+        }
+      }
+
       return { created: true, transaction };
     } catch (error) {
       /*
