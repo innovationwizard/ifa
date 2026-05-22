@@ -42,3 +42,6 @@ export type {
   TransactionListFilters,
   TransactionListResult,
 } from './transaction';
+
+export { merchantCategoryRepo } from './merchant-category';
+export type { MerchantCategoryRepo } from './merchant-category';
