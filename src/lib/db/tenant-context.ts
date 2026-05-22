@@ -23,7 +23,22 @@ export interface TenantContext {
   userAgent?: string;
 }
 
-const storage = new AsyncLocalStorage<TenantContext>();
+/*
+ * Cache the AsyncLocalStorage instance on globalThis so the Prisma
+ * extension's `getTenantContext` closure (built from the FIRST
+ * evaluation of this module) and `withTenant`'s `storage.run` (called
+ * from later evaluations after HMR, or from a different webpack
+ * layer) all read and write the SAME store. Without this, every
+ * module re-evaluation creates a fresh ALS, the extension's captured
+ * closure keeps pointing at the original, and every tenant-scoped
+ * query throws TenantContextMissingError despite being inside a
+ * `withTenant` call. In production the module evaluates once, so
+ * this branch is a one-time globalThis read.
+ */
+const globalForStorage = globalThis as unknown as {
+  __ifaTenantStorage?: AsyncLocalStorage<TenantContext>;
+};
+const storage = (globalForStorage.__ifaTenantStorage ??= new AsyncLocalStorage<TenantContext>());
 
 export class TenantContextMissingError extends Error {
   constructor(modelName: string, operation: string) {
@@ -44,6 +59,20 @@ export class TenantContextMissingError extends Error {
  * callers have a uniform await point.
  */
 export async function withTenant<T>(context: TenantContext, fn: () => T | Promise<T>): Promise<T> {
+  /*
+   * Dev-only safety net: publish the most recent context on globalThis
+   * as a fallback the tenancy extension can consult when AsyncLocalStorage
+   * propagation breaks across Next.js dev's module re-evaluation /
+   * webpack layer boundaries. Production paths never hit the fallback
+   * because the extension only consults it when `NODE_ENV !== 'production'`.
+   *
+   * NOT safe under concurrent requests in production — see notes in
+   * tenancy.ts. Dev workaround only until the underlying Next.js +
+   * Prisma ALS interaction is properly understood.
+   */
+  if (process.env.NODE_ENV !== 'production') {
+    (globalThis as unknown as { __ifaTenantCtx?: TenantContext }).__ifaTenantCtx = context;
+  }
   return storage.run(context, fn);
 }
 

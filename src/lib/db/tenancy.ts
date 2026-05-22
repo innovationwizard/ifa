@@ -121,7 +121,17 @@ export const tenancyExtension = Prisma.defineExtension({
           return query(args);
         }
 
-        const ctx = getTenantContext();
+        let ctx = getTenantContext();
+        /*
+         * Dev-only fall-open: when ALS propagation breaks across
+         * Next.js's module re-evaluation / webpack layer boundaries,
+         * fall back to the most recent context published by
+         * `withTenant` on globalThis. Single-tenant dev only — never
+         * applied in production (the env check below is gated).
+         */
+        if (!ctx && process.env.NODE_ENV !== 'production') {
+          ctx = (globalThis as unknown as { __ifaTenantCtx?: typeof ctx }).__ifaTenantCtx;
+        }
         if (!ctx) {
           throw new (await import('./tenant-context')).TenantContextMissingError(model, operation);
         }
