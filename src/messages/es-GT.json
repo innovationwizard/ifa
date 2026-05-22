@@ -291,6 +291,84 @@
     "achievements": "XP, niveles, rachas, misiones e insignias que convierten la disciplina financiera en hábito.",
     "settings": "Organización, integraciones, equipo, notificaciones, seguridad y exportación de datos."
   },
+  "reports": {
+    "hub": {
+      "title": "Reportes",
+      "subtitle": "Mira a dónde se va tu dinero, mes a mes.",
+      "cards": {
+        "cashFlow": {
+          "title": "Flujo mensual",
+          "description": "Cuánto entró y cuánto salió cada mes."
+        },
+        "categories": {
+          "title": "Gastos por categoría",
+          "description": "En qué gastaste más este periodo."
+        },
+        "merchants": {
+          "title": "Top comercios",
+          "description": "Los lugares donde dejaste más dinero."
+        }
+      },
+      "openCta": "Abrir reporte"
+    },
+    "period": {
+      "label": "Periodo",
+      "month": "Mes",
+      "threeMonths": "3 meses",
+      "sixMonths": "6 meses",
+      "year": "Año",
+      "custom": "Personalizado"
+    },
+    "empty": {
+      "title": "Sin datos para este periodo",
+      "body": "Aún no hay movimientos en el rango que elegiste. Prueba con un periodo más amplio o sube un nuevo estado de cuenta.",
+      "uploadCta": "Subir estado de cuenta"
+    },
+    "cashFlow": {
+      "title": "Flujo mensual",
+      "subtitle": "Ingresos y gastos por mes.",
+      "income": "Ingresos",
+      "expense": "Gastos",
+      "net": "Neto",
+      "summary": {
+        "totalIncome": "Total ingresos",
+        "totalExpense": "Total gastos",
+        "totalNet": "Neto del periodo",
+        "monthsCount": "Meses incluidos"
+      },
+      "tableCaption": "Resumen mensual de ingresos, gastos y neto."
+    },
+    "categories": {
+      "title": "Gastos por categoría",
+      "subtitle": "En qué categorías se va más tu dinero.",
+      "othersBucket": "Otros",
+      "columns": {
+        "category": "Categoría",
+        "total": "Total",
+        "share": "% del total",
+        "count": "Movimientos"
+      },
+      "tableCaption": "Gasto total por categoría en el periodo seleccionado."
+    },
+    "merchants": {
+      "title": "Top comercios",
+      "subtitle": "Los comercios donde más gastaste.",
+      "unknownLabel": "Comercio desconocido",
+      "columns": {
+        "merchant": "Comercio",
+        "nit": "NIT",
+        "total": "Total",
+        "visits": "Visitas",
+        "average": "Promedio por visita"
+      },
+      "tableCaption": "Comercios ordenados por monto total gastado."
+    },
+    "ariaSummary": {
+      "cashFlow": "Flujo mensual: {months} meses, ingresos totales {income}, gastos totales {expense}, neto {net}.",
+      "categories": "Gastos por categoría: {count} categorías, total {total}.",
+      "merchants": "Top comercios: {count} comercios, total {total}."
+    }
+  },
   "common": {
     "buttons": {
       "save": "Guardar",

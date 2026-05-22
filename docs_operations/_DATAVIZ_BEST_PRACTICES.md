@@ -30,10 +30,15 @@ for SaaS), LightningChart ($2,695/dev), Chart.js (SSR-hostile canvas), Nivo
    gauges. They are space-inefficient and degrade in comparison contexts.
    Bullet graphs convey actual / target / threshold bands linearly in a small
    space. See §1.5 + §2.
-2. **Currency format must be `Q1,234.56` (Q before number, no space).**
-   `es-GT` uses comma thousands + period decimal — same as US, **opposite**
-   of Spain's `1.234,56`. Banco de Guatemala writes its own currency
-   `Q 1.00` per the conmemorativo billete docs. See §3.
+2. **Currency format `Q 1,234.56`** — `Q`, then a non-breaking space
+   (U+00A0), then the amount with comma thousands + period decimal.
+   `es-GT` decimal convention matches the US, **opposite** of Spain's
+   `1.234,56`. Banco de Guatemala writes its own currency `Q 1.00` with
+   a space on the conmemorativo billete page; `Intl.NumberFormat('es-GT',
+{ currencyDisplay: 'narrowSymbol' })` produces exactly this shape.
+   _Correction:_ an earlier draft of this doc claimed "no space"; that
+   was an overspecification not borne out by Banguat's own writing or
+   by CLDR locale data. See §3.
 3. **Bar by default, horizontal sorted descending for category breakdowns.**
    NN/g: "in the vast majority of cases, use bar charts, line charts, or
    scatterplots." Donut/pie only when ≤5 slices and the explicit job is
@@ -44,6 +49,11 @@ for SaaS), LightningChart ($2,695/dev), Chart.js (SSR-hostile canvas), Nivo
 - **Sankey for cash flow** (Monarch shipped Sep 2023 — their highest-leverage
   view). Recharts lacks native Sankey; either custom SVG or a one-off
   `@nivo/sankey` import for that single component.
+  **Decision (2026-05-21): No Sankey adopted for now (rejected for the
+  time being).** Cash-flow reports will use stacked bars + grouped bars
+  in Batch 7. Revisit when a dedicated cash-flow view warrants the
+  ~50 KB dep, or when ECharts is adopted for other reasons (see §4.3
+  "Re-evaluate ECharts when…").
 - **Stacked bars with dotted-line previous-period overlay** (Copilot Money
   Cash Flow). One chart answers "how am I doing vs. last month?"
 - **Two-mode reports — Breakdown (totals) and Trends (over time)** (Monarch).
@@ -158,15 +168,15 @@ teal, Excelente 800-1000 deep teal), an actual-value marker, and a
 
 ## 3. Spanish / Guatemalan localization
 
-| Item                             | es-GT convention                                                                                                       | Source                                                                                                                                 |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Thousands separator**          | `,` — `1,234.56`                                                                                                       | [CLDR es-GT](https://www.localeplanet.com/icu/es-GT/index.html); _opposite_ of Spain (`1.234,56`)                                      |
-| **Decimal separator**            | `.`                                                                                                                    | Same as above                                                                                                                          |
-| **Currency code**                | `GTQ` (ISO 4217)                                                                                                       | [Wikipedia](https://en.wikipedia.org/wiki/ISO_4217:GTQ)                                                                                |
-| **Currency placement**           | `Q` **before** the number, **no space**: `Q100.00`, `Q1,234.56`                                                        | [Banco de Guatemala — Billete Conmemorativo Q 1.00](https://banguat.gob.gt/page/billete-conmemorativo-q-100)                           |
-| **Decimals**                     | Always show 2 for currency; drop only when chart is tight (label "Miles de Q")                                         |                                                                                                                                        |
-| **Month abbreviations (RAE)**    | `ene. feb. mar. abr. may. jun. jul. ago. sept. oct. nov. dic.`                                                         | RAE / [PTA Spanish Style Guide](https://www.pta.org/docs/default-source/uploadedfiles/downloads/spanishtranslationstyleguide-2017.pdf) |
-| **Vocabulary** (per IFA mandate) | _gastos_ not _egresos_; _ingresos_ OK; _neto_ OK; _promedio_ not _media_; _meta_ not _objetivo_; no English borrowings |                                                                                                                                        |
+| Item                             | es-GT convention                                                                                                                                                                                              | Source                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Thousands separator**          | `,` — `1,234.56`                                                                                                                                                                                              | [CLDR es-GT](https://www.localeplanet.com/icu/es-GT/index.html); _opposite_ of Spain (`1.234,56`)                                      |
+| **Decimal separator**            | `.`                                                                                                                                                                                                           | Same as above                                                                                                                          |
+| **Currency code**                | `GTQ` (ISO 4217)                                                                                                                                                                                              | [Wikipedia](https://en.wikipedia.org/wiki/ISO_4217:GTQ)                                                                                |
+| **Currency placement**           | `Q` **before** the number, separated by a non-breaking space (U+00A0): `Q 100.00`, `Q 1,234.56` — what `Intl.NumberFormat('es-GT', { currencyDisplay: 'narrowSymbol' })` emits and what Banguat itself writes | [Banco de Guatemala — Billete Conmemorativo Q 1.00](https://banguat.gob.gt/page/billete-conmemorativo-q-100)                           |
+| **Decimals**                     | Always show 2 for currency; drop only when chart is tight (label "Miles de Q")                                                                                                                                |                                                                                                                                        |
+| **Month abbreviations (RAE)**    | `ene. feb. mar. abr. may. jun. jul. ago. sept. oct. nov. dic.`                                                                                                                                                | RAE / [PTA Spanish Style Guide](https://www.pta.org/docs/default-source/uploadedfiles/downloads/spanishtranslationstyleguide-2017.pdf) |
+| **Vocabulary** (per IFA mandate) | _gastos_ not _egresos_; _ingresos_ OK; _neto_ OK; _promedio_ not _media_; _meta_ not _objetivo_; no English borrowings                                                                                        |                                                                                                                                        |
 
 **Implementation:** single source of truth via `Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' })` and `Intl.DateTimeFormat('es-GT', { month: 'short' })`. Both back onto CLDR and produce the right results out of the box. Never hand-format currency.
 
@@ -210,7 +220,10 @@ teal, Excelente 800-1000 deep teal), an actual-value marker, and a
 
 ```
 Default charts:           Recharts (via shadcn/ui charts wrappers)
-Sankey (cash flow):       @nivo/sankey inside a "use client" boundary
+Sankey (cash flow):       DEFERRED 2026-05-21 — no Sankey adopted for now
+                          (rejected for the time being). Cash flow uses
+                          stacked + grouped bars in Batch 7. Revisit if a
+                          dedicated cash-flow view warrants the dep.
 Trading / candlesticks:   TradingView Lightweight Charts (future trading view)
 Health Score:             Hand-rolled SVG bullet graph
 Heatmaps / advanced:      ECharts (lazy-loaded route, SSR-rendered) — when needed
@@ -232,6 +245,10 @@ Heatmaps / advanced:      ECharts (lazy-loaded route, SSR-rendered) — when nee
 3. **Sankey for cash flow** is the highest-leverage visualization in consumer
    finance. Maps perfectly to "entró → salió" in elementary Spanish.
    ([Monarch announcement](https://www.monarch.com/blog/visualize-your-cash-flow-like-never-before))
+   **Decision (2026-05-21): No Sankey adopted for now (rejected for
+   the time being).** Cash flow in Batch 7 uses stacked + grouped bars
+   instead; Sankey can return when a dedicated cash-flow view earns
+   its dep cost.
 4. **Stacked bar with dotted-line previous-period overlay** (Copilot Cash
    Flow) — one chart answers "how am I doing vs. last month?"
    ([Copilot help](https://help.copilot.money/en/articles/9682232-cash-flow-tab-overview))
@@ -271,17 +288,17 @@ Heatmaps / advanced:      ECharts (lazy-loaded route, SSR-rendered) — when nee
 
 1. **Default chart = horizontal bar, sorted descending.** Deviate only with documented reason.
 2. **Time series = vertical bars** (monthly) or **line** (daily, ≥30 points). Never both axes scaled independently.
-3. **Cash flow header = waterfall**; sub-cards = sparklines next to KPIs; full cash-flow report = Sankey (desktop) + stacked bars (mobile).
+3. **Cash flow header = waterfall**; sub-cards = sparklines next to KPIs; full cash-flow report = grouped/stacked bars on both desktop and mobile. (Sankey deferred 2026-05-21 — no Sankey adopted for now.)
 4. **Health Score = bullet graph**, **not** radial gauge. Show actual value, threshold bands (0-399 / 400-599 / 600-799 / 800-1000), and a "comparación" tick for last month's value.
 5. **Y-axis on bars starts at 0.** Line charts may truncate but must label the baseline.
 6. **No pie/donut with >5 slices.** Above that, switch to horizontal bar with "Otros" rollup.
 7. **No 3D, no drop shadows, no gradients on data marks.** Gridlines: at most 3–5, light gray, behind data.
 8. **Color encoding:** green positivo / red negativo — **always paired** with ▲/▼ glyph and the number. Categorical series: ColorBrewer **Set2** or **Tableau 10**; never RdYlGn.
 9. **Adjacent regions** (stacked bars, treemap if ever used) get a 1 px white stroke per WCAG SC 1.4.11.
-10. **Text alternative on every chart** — `<table>` fallback or `aria-label` summary ("Gastos de mayo: alimentación Q1,234.50, transporte Q567.00…").
+10. **Text alternative on every chart** — `<table>` fallback or `aria-label` summary ("Gastos de mayo: alimentación Q 1,234.50, transporte Q 567.00…").
 11. **Touch targets ≥ 44 px** on every interactive chart element. Tap to reveal tooltip; no hover-only states.
 12. **At 375 px:** max 6 categories above the fold; legends inline; axis labels rotated only if necessary; font ≥ 11 pt (≥ 13 pt preferred).
-13. **All numbers via `Intl.NumberFormat('es-GT')`** — currency `Q1,234.56`, percentages with `,` thousands and `.` decimal. Single source of truth.
+13. **All numbers via `Intl.NumberFormat('es-GT')`** — currency `Q 1,234.56` (Q + NBSP + amount), percentages with `,` thousands and `.` decimal. Single source of truth.
 14. **Forecasts render as fan charts** with a shaded "rango probable" band and plain-Spanish hover copy. Never a single deterministic line for the future.
 15. **Period-over-period comparisons** use side-by-side bars or comet charts. Never overlaid lines on a dual axis.
 
@@ -295,7 +312,7 @@ Cross-referencing [docs_operations/\_PHASE_6_7_PLAN.md](./_PHASE_6_7_PLAN.md):
 | -------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | B7             | Recharts BarChart + PieChart + table    | Use shadcn/ui charts wrappers on top of Recharts for Tailwind v4 theming. Pie only if ≤5 categories; default to horizontal bar.                                                                                                             |
 | B7             | Period picker for last 6 months default | Keep, but offer segmented control with `Mes / 3M / 6M / Año / Personalizado` matching Copilot. Default mobile = `Mes`, desktop = `6M`.                                                                                                      |
-| B7             | Monthly Cash Flow report                | Add a **waterfall** view as the hero, with grouped-bars + line-overlay as the secondary. Consider Sankey for desktop in a later iteration.                                                                                                  |
+| B7             | Monthly Cash Flow report                | Add a **waterfall** view as the hero, with grouped-bars + line-overlay as the secondary. Sankey deferred 2026-05-21 — no Sankey adopted for now (rejected for the time being).                                                              |
 | B12            | "Gauge UI component" for Health Score   | **Rename to "Bullet graph UI component"**. Drop the semicircle gauge from the demo kit — it conflicts with Few's published guidance. Implement linear bullet with threshold bands and a previous-period tick.                               |
 | All UI batches | _Implicit:_ ad-hoc currency formatting  | Add a `<Money>` primitive built on `Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' })` — single source of truth. Mention it explicitly in B7's acceptance criteria so the negative-amount-parentheses rule is enforceable. |
 
@@ -305,7 +322,11 @@ These are recommendations, not silent changes. The plan stays as written until y
 
 ## 8. Open questions worth user input
 
-1. **Are we OK adding `@nivo/sankey` as a single-component dep for the cash-flow Sankey view, or hold off?** Adds ~50 KB gzip but it's the highest-leverage chart in consumer finance per Monarch's data.
+1. ~~**Are we OK adding `@nivo/sankey` as a single-component dep for the cash-flow Sankey view, or hold off?**~~
+   **Resolved 2026-05-21: No Sankey adopted for now (rejected for the
+   time being).** Cash-flow reports in Batch 7 use stacked + grouped
+   bars. Sankey can return when a dedicated cash-flow view earns the
+   ~50 KB dep cost, or as part of a future ECharts adoption.
 2. **Should the Health Score bullet graph fully replace the semicircle gauge in the demo kit?** The demo kit is frozen under `demo/`; updating it requires a separate commit to that snapshot.
 3. **Color palette decision:** stick with the IFA brand teal/navy/gold from the design system, or layer ColorBrewer Set2 / Tableau 10 for categorical series? The brand palette is small; categorical needs ≥6 distinguishable hues for top-merchants charts.
 4. **Do we want Spanish-localized chart-type names in copy** (e.g., "gráfica de barras" in tooltips) or treat charts as language-neutral?

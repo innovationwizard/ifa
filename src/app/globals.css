@@ -217,3 +217,41 @@
   outline: 2px solid var(--color-ifa-teal-500);
   outline-offset: 2px;
 }
+
+/*
+ * Print stylesheet — Phase 6/7 Batch 7.
+ *
+ * Goal per the plan: a `/reportes/*` page prints cleanly on a single
+ * page (basic — full print polish is a follow-up). We:
+ *   - hide the app shell chrome (sidebar, top bar, paywall banner,
+ *     period picker) so the printed page is pure report content
+ *   - keep cards from splitting across page breaks via
+ *     `break-inside: avoid` (cards already carry the utility class
+ *     in markup; this is a belt-and-suspenders fallback)
+ *   - flatten colored backgrounds to white so ink usage is sane
+ *   - keep `Money` figures in tabular-nums so columns still align
+ *     on paper
+ */
+@media print {
+  [data-slot='sidebar'],
+  [data-slot='top-bar'],
+  [data-slot='paywall-banner'],
+  nav,
+  [role='group'][aria-label] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  [data-slot='card'] {
+    border: 1px solid #cbd5e1 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
