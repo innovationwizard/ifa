@@ -6,7 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Papa from 'papaparse';
 import { CheckCircle2, FileUp, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
-import { detectColumns, type ColumnMapping, type DetectedBank } from '@/lib/imports/column-detect';
+import {
+  detectColumns,
+  validateMapping,
+  type CanonicalField,
+  type ColumnMapping,
+  type DetectedBank,
+} from '@/lib/imports/column-detect';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { processPendingJobs } from '@/app/(app)/transacciones/actions';
@@ -103,7 +109,10 @@ export function CsvImportWizard() {
     });
   }
 
-  async function handleImport(previewing: Extract<Wizard, { stage: 'previewing' }>): Promise<void> {
+  async function handleImport(
+    previewing: Extract<Wizard, { stage: 'previewing' }>,
+    confirmedMapping: ColumnMapping,
+  ): Promise<void> {
     setState({ stage: 'uploading', file: previewing.file });
     try {
       const prepareRes = await fetch('/api/v1/transactions/import/prepare', {
@@ -137,7 +146,7 @@ export function CsvImportWizard() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           storagePath: prepare.data.path,
-          mapping: previewing.mapping,
+          mapping: confirmedMapping,
         }),
       });
       if (!importRes.ok) {
@@ -162,8 +171,8 @@ export function CsvImportWizard() {
       {state.stage === 'previewing' && (
         <PreviewStep
           state={state}
-          onConfirm={() => {
-            void handleImport(state);
+          onConfirm={(confirmedMapping) => {
+            void handleImport(state, confirmedMapping);
           }}
           onCancel={reset}
         />
@@ -232,13 +241,27 @@ function IdleStep({
   );
 }
 
+/**
+ * Canonical-field options the user can pick per column. Order is
+ * intentional — most-common-first for fewer dropdown scrolls.
+ */
+const FIELD_OPTIONS: readonly CanonicalField[] = [
+  'date',
+  'description',
+  'amount',
+  'debit',
+  'credit',
+  'merchantNit',
+  'ignore',
+];
+
 function PreviewStep({
   state,
   onConfirm,
   onCancel,
 }: {
   state: Extract<Wizard, { stage: 'previewing' }>;
-  onConfirm: () => void;
+  onConfirm: (mapping: ColumnMapping) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations('imports');
@@ -248,6 +271,19 @@ function PreviewStep({
       : state.detectedBank === 'BANCO_INDUSTRIAL'
         ? 'Banco Industrial'
         : t('preview.genericLayout');
+
+  /*
+   * Local mapping state — initialized from the heuristic-detected
+   * mapping, mutated by the per-column dropdowns. The wizard parent
+   * receives the final (possibly-corrected) mapping via onConfirm.
+   *
+   * NOT reset across re-mounts of PreviewStep — `state` is keyed on
+   * the file in the parent wizard, so a fresh file picks a fresh
+   * PreviewStep with fresh local state.
+   */
+  const [mapping, setMapping] = useState<ColumnMapping>(state.mapping);
+
+  const validation = validateMapping(mapping);
 
   return (
     <div className="flex flex-col gap-6">
@@ -266,6 +302,18 @@ function PreviewStep({
             </AlertDescription>
           </Alert>
         )}
+        {!validation.ok && (
+          <Alert variant="destructive" role="alert">
+            <AlertDescription className="flex items-start gap-2 text-xs">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>
+                {t('preview.missingFields', {
+                  fields: validation.missing.map((f) => t(`preview.fields.${f}`)).join(', '),
+                })}
+              </span>
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div className="rounded-ifa-card border-ifa-gray-300 overflow-x-auto border">
@@ -274,11 +322,26 @@ function PreviewStep({
             <tr>
               {state.headers.map((h) => (
                 <th key={h} className="px-3 py-2 text-left font-medium">
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-1">
                     <span>{h}</span>
-                    <span className="text-ifa-gray-500 text-[10px] tracking-wide uppercase">
-                      {t(`preview.fields.${state.mapping[h] ?? 'ignore'}`)}
-                    </span>
+                    <label className="sr-only" htmlFor={`map-${h}`}>
+                      {t('preview.mapLabel', { header: h })}
+                    </label>
+                    <select
+                      id={`map-${h}`}
+                      value={mapping[h] ?? 'ignore'}
+                      onChange={(e) => {
+                        const next = e.target.value as CanonicalField;
+                        setMapping((prev) => ({ ...prev, [h]: next }));
+                      }}
+                      className="border-ifa-gray-300 focus:border-ifa-teal-600 focus:ring-ifa-teal-100 rounded-md border bg-white px-2 py-1 text-xs font-normal tracking-normal normal-case focus:ring-2 focus:outline-none"
+                    >
+                      {FIELD_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {t(`preview.fields.${opt}`)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </th>
               ))}
@@ -302,7 +365,14 @@ function PreviewStep({
         <Button variant="outline" onClick={onCancel}>
           {t('preview.cancel')}
         </Button>
-        <Button onClick={onConfirm}>{t('preview.confirm')}</Button>
+        <Button
+          onClick={() => {
+            onConfirm(mapping);
+          }}
+          disabled={!validation.ok}
+        >
+          {t('preview.confirm')}
+        </Button>
       </div>
     </div>
   );

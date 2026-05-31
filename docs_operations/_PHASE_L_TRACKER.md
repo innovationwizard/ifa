@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L1 — Universal AI-assisted ingestion engine
-- **Active sub-batch:** L1.7.5 — DONE locally (route tests, 8/8), awaiting founder commit + push
-- **Last commit relevant to Phase L:** `d9d29ac` (L1.7 parse route)
-- **Next concrete action:** Founder commits L1.7.5 (`src/app/api/v1/imports/parse/route.test.ts`, 8 passing tests). After push, this doc advances to L1.8 (wizard's "Confirma el mapeo" step UI — adds the confirm-mapping screen to `csv-import-wizard.tsx` that surfaces when overallConfidence is low). L1.8 starts the client-side work; ~3 sub-batches expected (L1.8 UI scaffolding, L1.9 wire to L1.7 endpoint, L1.10 i18n).
-- **Blockers:** §6.1 still open (founder collecting samples; affects honest L1.11 e2e + future L2.10 PDF e2e).
-- **Files in flight (uncommitted edits):** `src/app/api/v1/imports/parse/route.test.ts` (new, ready to commit)
+- **Active sub-batch:** L1.8 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `cf90104` (L1.7.5 route tests)
+- **Next concrete action:** Founder commits L1.8 (editable mapping in `csv-import-wizard.tsx` + 2 new i18n keys). After push, this doc advances to L1.9 (wire the wizard to the L1.7 `/api/v1/imports/parse` endpoint — replaces the in-wizard `detectColumns(headers)` call with a `fetch` to the new server route, surfaces orchestrator confidence + AI-extracted mapping).
+- **Blockers:** §6.1 still open. L1.9 unblocked (server-call wiring).
+- **Files in flight (uncommitted edits):** `src/components/imports/csv-import-wizard.tsx` (modified) + `src/messages/es-GT.json` (2 new keys: `imports.preview.missingFields`, `imports.preview.mapLabel`)
 
 ---
 
@@ -92,7 +92,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L1.6** — `src/lib/ingestion/extractor.test.ts`: 4+ tests (heuristic-confident path, AI-fallback path, AI-fails-fallback, empty-sample defensive) — shipped 7 tests · `b9e26fa` · 2026-05-22
 - [x] **L1.6.5** — `src/lib/ingestion/heuristic-detect.test.ts`: pin `SIGNATURE_PER_COLUMN_CONFIDENCE` + `GENERIC_PER_COLUMN_CONFIDENCE` constants; signature-match → conf 1.0 (BAC, `BANCO_INDUSTRIAL`); generic keyword → conf 0.7; all-ignore headers → outcome 'fallback'; sample projection. _(Inserted because L1.6 mocks the heuristic entirely and therefore does not pin its behavior, contradicting heuristic-detect.ts's own comment promising L1.6 coverage.)_ · `04a530f` · 2026-05-22
 - [x] **L1.7** — `src/app/api/v1/imports/parse/route.ts`: server endpoint accepting sample → returning ExtractorResult · `d9d29ac` · 2026-05-22
-- [ ] **L1.7.5** — `src/app/api/v1/imports/parse/route.test.ts`: auth gating (401 anon, 400 `no_profile`), Zod validation (400 malformed payload, 400 invalid JSON), happy path (200 with orchestrator result, mocked `extractFromCsv`). _(Inserted because the original L1 list jumped from L1.7 to L1.8 without route-test coverage; auth + payload regressions are the kind of thing that should not ship to prod without a unit test.)_
+- [x] **L1.7.5** — `src/app/api/v1/imports/parse/route.test.ts`: auth gating (401 anon, 400 `no_profile`), Zod validation (400 malformed payload, 400 invalid JSON), happy path (200 with orchestrator result, mocked `extractFromCsv`). _(Inserted because the original L1 list jumped from L1.7 to L1.8 without route-test coverage; auth + payload regressions are the kind of thing that should not ship to prod without a unit test.)_ · `cf90104` · 2026-05-22
 - [ ] **L1.8** — `src/components/imports/csv-import-wizard.tsx`: add "Confirma el mapeo" step + editable per-column dropdowns
 - [ ] **L1.9** — wire wizard to L1.7 endpoint (replace the in-wizard heuristic with a server call)
 - [ ] **L1.10** — `src/messages/es-GT.json`: `imports.mapping.*` block (Spanish copy for confirm step)
@@ -236,6 +236,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-05-22 — L1.7.5 closed — `cf90104` — parse route tests (`src/app/api/v1/imports/parse/route.test.ts`); 8 mocked-orchestrator tests pinning auth gating, payload validation (all failure paths verify extractMock NOT called), happy path verbatim forwarding
 - 2026-05-22 — L1.7 closed — `d9d29ac` — parse route (`src/app/api/v1/imports/parse/route.ts`); POST `{headers, sampleRows}` → ExtractorResult; auth-gated 401/400; Zod-validated payload; calls extractFromCsv; no commit (mapping-only)
 - 2026-05-22 — L1.6.5 closed — `04a530f` — heuristic-detect tests (`src/lib/ingestion/heuristic-detect.test.ts`); 9 tests pinning constants (1.0 + 0.7), BAC + BANCO_INDUSTRIAL signatures, generic fallback, defensive paths, sample projection
 - 2026-05-22 — L1.6 closed — `b9e26fa` — extractor orchestrator tests (`src/lib/ingestion/extractor.test.ts`); 7 mocked-step tests pinning heuristic-confident skip, AI-fallback escalation, trace merge, failed-AI propagation, threshold boundary at 0.9

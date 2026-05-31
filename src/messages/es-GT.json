@@ -244,6 +244,8 @@
       "detected": "Detectamos el formato de {bank}",
       "genericLayout": "tu banco",
       "lowConfidence": "No reconocimos todas las columnas. Revisa el mapeo abajo antes de continuar.",
+      "missingFields": "Falta asignar: {fields}. Ajusta los menús arriba para que cada columna importante tenga un campo.",
+      "mapLabel": "Asignar la columna {header} a un campo",
       "cancel": "Elegir otro archivo",
       "confirm": "Importar movimientos",
       "fields": {
