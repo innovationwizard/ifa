@@ -3,7 +3,8 @@ import {
   type CanonicalField,
   type ColumnMapping,
 } from '@/lib/imports/column-detect';
-import type { ColumnConfidence, ExtractedRow, ExtractorResult, ExtractorStepTrace } from './types';
+import { projectCsvSample } from './projection';
+import type { ColumnConfidence, ExtractorResult, ExtractorStepTrace } from './types';
 
 /**
  * Heuristic detector — Phase L1.2.
@@ -77,7 +78,7 @@ export function heuristicDetect(input: HeuristicInput): ExtractorResult {
   const detection = detectColumns(input.headers);
 
   const confidence = buildPerFieldConfidence(detection.mapping, detection.detectedBank);
-  const sample = projectSample(input.sampleRows, detection.mapping);
+  const sample = projectCsvSample(input.sampleRows, detection.mapping);
   const durationMs = Date.now() - start;
 
   const trace: ExtractorStepTrace = {
@@ -127,46 +128,4 @@ function buildPerFieldConfidence(
     result[field] = { score: perColumn };
   }
   return result;
-}
-
-/**
- * Project source rows (`header → cell`) into `ExtractedRow[]`
- * (canonical-field shape). Columns mapped to `ignore` are dropped.
- *
- * When multiple source headers map to the same canonical field
- * (mis-detected layout), the LAST matching cell wins. This is the
- * caller's responsibility to surface via the confidence map (see
- * `buildPerFieldConfidence`'s same-field-multiple-headers caveat).
- *
- * Missing cells are preserved as `null` so the wizard renders a
- * visible gap rather than a blank that looks like "we found
- * nothing" when in fact the source row had nothing.
- */
-function projectSample(rows: Record<string, string>[], mapping: ColumnMapping): ExtractedRow[] {
-  return rows.map((row) => {
-    const out: ExtractedRow = {
-      date: null,
-      description: null,
-      amount: null,
-      debit: null,
-      credit: null,
-      merchantNit: null,
-    };
-    for (const [header, value] of Object.entries(row)) {
-      const field = mapping[header];
-      if (!field || field === 'ignore') continue;
-      // Exhaustively narrow to the writable fields on ExtractedRow.
-      if (
-        field === 'date' ||
-        field === 'description' ||
-        field === 'amount' ||
-        field === 'debit' ||
-        field === 'credit' ||
-        field === 'merchantNit'
-      ) {
-        out[field] = value ?? null;
-      }
-    }
-    return out;
-  });
 }
