@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L1 — Universal AI-assisted ingestion engine
-- **Active sub-batch:** L1.9 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** `6daee54` (L1.8 editable mapping)
-- **Next concrete action:** Founder commits L1.9 (wizard now fetches from `/api/v1/imports/parse`; new `detecting` state with spinner; previewing state carries `source`; +2 i18n keys). After push, this doc advances to L1.10 — but L1.10's `imports.mapping.*` block scope may be substantially smaller now that L1.8 + L1.9 already added the most critical keys (`preview.missingFields`, `preview.mapLabel`, `progress.detecting`, `errors.detectFailed`). Re-scope L1.10 on entry: it likely becomes surfacing AI-source/confidence to the user ("este mapeo lo armamos con IA, revísalo") + per-field reason copy from the orchestrator's `confidence[x].reason`.
-- **Blockers:** §6.1 still open. L1.10 unblocked.
-- **Files in flight (uncommitted edits):** `src/components/imports/csv-import-wizard.tsx` (modified, new `detecting` state + server fetch) + `src/messages/es-GT.json` (+2 keys: `imports.progress.detecting`, `imports.errors.detectFailed`)
+- **Active sub-batch:** L1.10 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `e4d9c30` (L1.9 wizard server fetch)
+- **Next concrete action:** Founder commits L1.10. After push, this doc advances to L1.11 (e2e spec for the low-confidence path). L1.11 will mock the parse endpoint to return an `ai`-source `ExtractorResult` with a per-field `reason`, then assert the wizard renders the AI banner and the reason text. §6.1 still affects honest-fixture coverage of real-bank CSVs, but L1.11 itself can ship against synthetic.
+- **Blockers:** §6.1 still open (real-bank sample collection). L1.11 unblocked.
+- **Files in flight (uncommitted edits):** `src/components/imports/csv-import-wizard.tsx` (modified — AI-source banner + per-column reason rendering, `perFieldConfidence` in state) + `src/messages/es-GT.json` (+1 key: `imports.preview.aiSourceBanner`)
 
 ---
 
@@ -94,8 +94,8 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L1.7** — `src/app/api/v1/imports/parse/route.ts`: server endpoint accepting sample → returning ExtractorResult · `d9d29ac` · 2026-05-22
 - [x] **L1.7.5** — `src/app/api/v1/imports/parse/route.test.ts`: auth gating (401 anon, 400 `no_profile`), Zod validation (400 malformed payload, 400 invalid JSON), happy path (200 with orchestrator result, mocked `extractFromCsv`). _(Inserted because the original L1 list jumped from L1.7 to L1.8 without route-test coverage; auth + payload regressions are the kind of thing that should not ship to prod without a unit test.)_ · `cf90104` · 2026-05-22
 - [x] **L1.8** — `src/components/imports/csv-import-wizard.tsx`: add "Confirma el mapeo" step + editable per-column dropdowns · `6daee54` · 2026-05-22
-- [ ] **L1.9** — wire wizard to L1.7 endpoint (replace the in-wizard heuristic with a server call)
-- [ ] **L1.10** — `src/messages/es-GT.json`: `imports.mapping.*` block (Spanish copy for confirm step)
+- [x] **L1.9** — wire wizard to L1.7 endpoint (replace the in-wizard heuristic with a server call) · `e4d9c30` · 2026-05-22
+- [ ] **L1.10** — surface AI-source banner + per-column `reason` in PreviewStep. _(Re-scoped: original was "imports.mapping.\* i18n block" but L1.8 + L1.9 already added the critical UI keys. L1.10 now extends `previewing` state with `perFieldConfidence`, propagates from `runExtractor`, renders a banner when `source === 'ai'/'mixed'`, and shows the AI's per-column reason text under each select.)_
 - [ ] **L1.11** — `tests/e2e/imports-mapping.spec.ts`: e2e spec for the low-confidence path (mock-bank CSV → confirm step renders)
 - [ ] **L1.12** — Gate sweep + tracker update (mark L1 done in §3 + §5 + §1) + commit message proposal
 
@@ -236,6 +236,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-05-22 — L1.9 closed — `e4d9c30` — wizard wired to parse endpoint (`src/components/imports/csv-import-wizard.tsx`); dropped in-wizard `detectColumns`; new `detecting` state w/ spinner; `runExtractor` POSTs to `/api/v1/imports/parse`; previewing state carries `source`; defensive fallbacks for missing bank/mapping; +2 i18n keys; locked no-silent-fallback behavior on server error
 - 2026-05-22 — L1.8 closed — `6daee54` — wizard editable mapping (`src/components/imports/csv-import-wizard.tsx`); per-column `<select>` over 7 canonical fields; live `validateMapping` disables confirm + lists missing fields; `onConfirm` signature changed to receive corrected mapping; +2 i18n keys
 - 2026-05-22 — L1.7.5 closed — `cf90104` — parse route tests (`src/app/api/v1/imports/parse/route.test.ts`); 8 mocked-orchestrator tests pinning auth gating, payload validation (all failure paths verify extractMock NOT called), happy path verbatim forwarding
 - 2026-05-22 — L1.7 closed — `d9d29ac` — parse route (`src/app/api/v1/imports/parse/route.ts`); POST `{headers, sampleRows}` → ExtractorResult; auth-gated 401/400; Zod-validated payload; calls extractFromCsv; no commit (mapping-only)

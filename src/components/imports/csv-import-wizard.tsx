@@ -12,7 +12,7 @@ import {
   type ColumnMapping,
   type DetectedBank,
 } from '@/lib/imports/column-detect';
-import type { ExtractorResult, ExtractorSource } from '@/lib/ingestion/types';
+import type { ColumnConfidence, ExtractorResult, ExtractorSource } from '@/lib/ingestion/types';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { processPendingJobs } from '@/app/(app)/transacciones/actions';
@@ -63,6 +63,14 @@ type Wizard =
       sampleRows: Record<string, string>[];
       /** Where the mapping came from — 'heuristic' or 'ai' (or 'mixed'/'manual'). */
       source: ExtractorSource;
+      /**
+       * Per-canonical-field confidence + optional Spanish reason
+       * from the orchestrator. The AI emits a `reason` only for
+       * fields with confidence < 0.7 — so any reason's presence
+       * means "user should look at this column" and the wizard
+       * surfaces it below the column's select.
+       */
+      perFieldConfidence: Partial<Record<CanonicalField, ColumnConfidence>>;
     }
   | { stage: 'uploading'; file: File }
   | { stage: 'importing' }
@@ -166,6 +174,7 @@ export function CsvImportWizard() {
         detectedBank,
         confidence: result.overallConfidence,
         source: result.source,
+        perFieldConfidence: result.confidence,
       });
     } catch {
       setState({ stage: 'error', message: t('errors.detectFailed') });
@@ -359,6 +368,14 @@ function PreviewStep({
             {t('preview.detected', { bank: bankLabel })}
           </span>
         </div>
+        {(state.source === 'ai' || state.source === 'mixed') && (
+          <Alert variant="default" role="alert">
+            <AlertDescription className="flex items-start gap-2 text-xs">
+              <Sparkles className="text-ifa-teal-600 mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>{t('preview.aiSourceBanner')}</span>
+            </AlertDescription>
+          </Alert>
+        )}
         {state.confidence < 0.6 && (
           <Alert variant="default" role="alert">
             <AlertDescription className="flex items-start gap-2 text-xs">
@@ -385,31 +402,48 @@ function PreviewStep({
         <table className="w-full text-xs">
           <thead className="bg-ifa-navy-50 text-ifa-navy-900">
             <tr>
-              {state.headers.map((h) => (
-                <th key={h} className="px-3 py-2 text-left font-medium">
-                  <div className="flex flex-col gap-1">
-                    <span>{h}</span>
-                    <label className="sr-only" htmlFor={`map-${h}`}>
-                      {t('preview.mapLabel', { header: h })}
-                    </label>
-                    <select
-                      id={`map-${h}`}
-                      value={mapping[h] ?? 'ignore'}
-                      onChange={(e) => {
-                        const next = e.target.value as CanonicalField;
-                        setMapping((prev) => ({ ...prev, [h]: next }));
-                      }}
-                      className="border-ifa-gray-300 focus:border-ifa-teal-600 focus:ring-ifa-teal-100 rounded-md border bg-white px-2 py-1 text-xs font-normal tracking-normal normal-case focus:ring-2 focus:outline-none"
-                    >
-                      {FIELD_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {t(`preview.fields.${opt}`)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </th>
-              ))}
+              {state.headers.map((h) => {
+                const field = mapping[h] ?? 'ignore';
+                /*
+                 * The orchestrator's per-field reason is keyed by
+                 * CANONICAL field, not header. If two headers map to
+                 * the same canonical field, the reason renders under
+                 * both — honest because the AI's concern is about
+                 * the field's identification, not the header text.
+                 */
+                const reason =
+                  field !== 'ignore' ? state.perFieldConfidence[field]?.reason : undefined;
+                return (
+                  <th key={h} className="px-3 py-2 text-left font-medium">
+                    <div className="flex flex-col gap-1">
+                      <span>{h}</span>
+                      <label className="sr-only" htmlFor={`map-${h}`}>
+                        {t('preview.mapLabel', { header: h })}
+                      </label>
+                      <select
+                        id={`map-${h}`}
+                        value={field}
+                        onChange={(e) => {
+                          const next = e.target.value as CanonicalField;
+                          setMapping((prev) => ({ ...prev, [h]: next }));
+                        }}
+                        className="border-ifa-gray-300 focus:border-ifa-teal-600 focus:ring-ifa-teal-100 rounded-md border bg-white px-2 py-1 text-xs font-normal tracking-normal normal-case focus:ring-2 focus:outline-none"
+                      >
+                        {FIELD_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {t(`preview.fields.${opt}`)}
+                          </option>
+                        ))}
+                      </select>
+                      {reason && (
+                        <p className="text-ifa-gold-700 max-w-[16rem] text-[10px] leading-snug font-normal tracking-normal normal-case">
+                          {reason}
+                        </p>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

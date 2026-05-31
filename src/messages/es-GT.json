@@ -246,6 +246,7 @@
       "lowConfidence": "No reconocimos todas las columnas. Revisa el mapeo abajo antes de continuar.",
       "missingFields": "Falta asignar: {fields}. Ajusta los menús arriba para que cada columna importante tenga un campo.",
       "mapLabel": "Asignar la columna {header} a un campo",
+      "aiSourceBanner": "Este mapeo lo armamos con IA. Revisa cada columna y ajusta los menús si algo no cuadra.",
       "cancel": "Elegir otro archivo",
       "confirm": "Importar movimientos",
       "fields": {
