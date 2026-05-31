@@ -259,6 +259,7 @@
       }
     },
     "progress": {
+      "detecting": "Analizando tu archivo...",
       "uploading": "Subiendo tu archivo...",
       "importing": "Leyendo y guardando tus movimientos..."
     },
@@ -283,6 +284,7 @@
       "fileTooLarge": "El archivo pesa más de 10 MB. Por ahora solo aceptamos archivos más pequeños.",
       "noHeaders": "No encontramos encabezados en el archivo. Asegúrate de que la primera fila sea los nombres de las columnas.",
       "parseFailed": "No pudimos leer el archivo. Verifica que sea un CSV válido.",
+      "detectFailed": "No pudimos analizar tu archivo. Intenta de nuevo en un minuto.",
       "invalidMapping": "No pudimos detectar las columnas. Necesitamos al menos fecha, descripción y monto.",
       "generic": "Algo falló al importar. Intenta de nuevo en un minuto.",
       "retry": "Intentar de nuevo"

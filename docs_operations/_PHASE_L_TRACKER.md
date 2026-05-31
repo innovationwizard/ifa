@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L1 — Universal AI-assisted ingestion engine
-- **Active sub-batch:** L1.8 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** `cf90104` (L1.7.5 route tests)
-- **Next concrete action:** Founder commits L1.8 (editable mapping in `csv-import-wizard.tsx` + 2 new i18n keys). After push, this doc advances to L1.9 (wire the wizard to the L1.7 `/api/v1/imports/parse` endpoint — replaces the in-wizard `detectColumns(headers)` call with a `fetch` to the new server route, surfaces orchestrator confidence + AI-extracted mapping).
-- **Blockers:** §6.1 still open. L1.9 unblocked (server-call wiring).
-- **Files in flight (uncommitted edits):** `src/components/imports/csv-import-wizard.tsx` (modified) + `src/messages/es-GT.json` (2 new keys: `imports.preview.missingFields`, `imports.preview.mapLabel`)
+- **Active sub-batch:** L1.9 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `6daee54` (L1.8 editable mapping)
+- **Next concrete action:** Founder commits L1.9 (wizard now fetches from `/api/v1/imports/parse`; new `detecting` state with spinner; previewing state carries `source`; +2 i18n keys). After push, this doc advances to L1.10 — but L1.10's `imports.mapping.*` block scope may be substantially smaller now that L1.8 + L1.9 already added the most critical keys (`preview.missingFields`, `preview.mapLabel`, `progress.detecting`, `errors.detectFailed`). Re-scope L1.10 on entry: it likely becomes surfacing AI-source/confidence to the user ("este mapeo lo armamos con IA, revísalo") + per-field reason copy from the orchestrator's `confidence[x].reason`.
+- **Blockers:** §6.1 still open. L1.10 unblocked.
+- **Files in flight (uncommitted edits):** `src/components/imports/csv-import-wizard.tsx` (modified, new `detecting` state + server fetch) + `src/messages/es-GT.json` (+2 keys: `imports.progress.detecting`, `imports.errors.detectFailed`)
 
 ---
 
@@ -93,7 +93,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L1.6.5** — `src/lib/ingestion/heuristic-detect.test.ts`: pin `SIGNATURE_PER_COLUMN_CONFIDENCE` + `GENERIC_PER_COLUMN_CONFIDENCE` constants; signature-match → conf 1.0 (BAC, `BANCO_INDUSTRIAL`); generic keyword → conf 0.7; all-ignore headers → outcome 'fallback'; sample projection. _(Inserted because L1.6 mocks the heuristic entirely and therefore does not pin its behavior, contradicting heuristic-detect.ts's own comment promising L1.6 coverage.)_ · `04a530f` · 2026-05-22
 - [x] **L1.7** — `src/app/api/v1/imports/parse/route.ts`: server endpoint accepting sample → returning ExtractorResult · `d9d29ac` · 2026-05-22
 - [x] **L1.7.5** — `src/app/api/v1/imports/parse/route.test.ts`: auth gating (401 anon, 400 `no_profile`), Zod validation (400 malformed payload, 400 invalid JSON), happy path (200 with orchestrator result, mocked `extractFromCsv`). _(Inserted because the original L1 list jumped from L1.7 to L1.8 without route-test coverage; auth + payload regressions are the kind of thing that should not ship to prod without a unit test.)_ · `cf90104` · 2026-05-22
-- [ ] **L1.8** — `src/components/imports/csv-import-wizard.tsx`: add "Confirma el mapeo" step + editable per-column dropdowns
+- [x] **L1.8** — `src/components/imports/csv-import-wizard.tsx`: add "Confirma el mapeo" step + editable per-column dropdowns · `6daee54` · 2026-05-22
 - [ ] **L1.9** — wire wizard to L1.7 endpoint (replace the in-wizard heuristic with a server call)
 - [ ] **L1.10** — `src/messages/es-GT.json`: `imports.mapping.*` block (Spanish copy for confirm step)
 - [ ] **L1.11** — `tests/e2e/imports-mapping.spec.ts`: e2e spec for the low-confidence path (mock-bank CSV → confirm step renders)
@@ -236,6 +236,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-05-22 — L1.8 closed — `6daee54` — wizard editable mapping (`src/components/imports/csv-import-wizard.tsx`); per-column `<select>` over 7 canonical fields; live `validateMapping` disables confirm + lists missing fields; `onConfirm` signature changed to receive corrected mapping; +2 i18n keys
 - 2026-05-22 — L1.7.5 closed — `cf90104` — parse route tests (`src/app/api/v1/imports/parse/route.test.ts`); 8 mocked-orchestrator tests pinning auth gating, payload validation (all failure paths verify extractMock NOT called), happy path verbatim forwarding
 - 2026-05-22 — L1.7 closed — `d9d29ac` — parse route (`src/app/api/v1/imports/parse/route.ts`); POST `{headers, sampleRows}` → ExtractorResult; auth-gated 401/400; Zod-validated payload; calls extractFromCsv; no commit (mapping-only)
 - 2026-05-22 — L1.6.5 closed — `04a530f` — heuristic-detect tests (`src/lib/ingestion/heuristic-detect.test.ts`); 9 tests pinning constants (1.0 + 0.7), BAC + BANCO_INDUSTRIAL signatures, generic fallback, defensive paths, sample projection

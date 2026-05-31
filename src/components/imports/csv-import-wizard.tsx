@@ -7,22 +7,27 @@ import { useTranslations } from 'next-intl';
 import Papa from 'papaparse';
 import { CheckCircle2, FileUp, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
 import {
-  detectColumns,
   validateMapping,
   type CanonicalField,
   type ColumnMapping,
   type DetectedBank,
 } from '@/lib/imports/column-detect';
+import type { ExtractorResult, ExtractorSource } from '@/lib/ingestion/types';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { processPendingJobs } from '@/app/(app)/transacciones/actions';
 
 /**
- * Client-side state machine for /transacciones/importar (S-3.5).
+ * Client-side state machine for /transacciones/importar (S-3.5,
+ * extended in Phase L1.9 — universal AI-assisted ingestion).
  *
  *   idle       → user hasn't picked a file
- *   previewing → file parsed client-side, mapping auto-detected,
- *                first rows rendered for user review
+ *   detecting  → file parsed locally; headers + sample posted to
+ *                `/api/v1/imports/parse`. Server runs the orchestrator
+ *                (heuristic → AI fallback). User sees a spinner; may
+ *                take ~1–3s when AI is invoked.
+ *   previewing → orchestrator returned a mapping. First rows + per-
+ *                column dropdowns rendered for user review.
  *   uploading  → file being PUT to Supabase Storage via signed URL
  *   importing  → server is parsing + inserting rows
  *   done       → server returned a summary
@@ -32,10 +37,22 @@ import { processPendingJobs } from '@/app/(app)/transacciones/actions';
  * server, so detection/parsing behavior matches what will actually
  * happen on commit. The sample is capped at 50 rows for snappy UI;
  * the full file goes to the server regardless.
+ *
+ * On server-side parse error we surface a clear error — we do NOT
+ * silently fall back to local heuristic. The locked decision §0.4
+ * ("must accept whatever the user uploads") depends on the AI
+ * fallback running; degrading silently to heuristic-only would
+ * mis-map low-confidence CSVs without the user knowing.
  */
 
 type Wizard =
   | { stage: 'idle' }
+  | {
+      stage: 'detecting';
+      file: File;
+      headers: string[];
+      sampleRows: Record<string, string>[];
+    }
   | {
       stage: 'previewing';
       file: File;
@@ -44,6 +61,8 @@ type Wizard =
       detectedBank: DetectedBank;
       confidence: number;
       sampleRows: Record<string, string>[];
+      /** Where the mapping came from — 'heuristic' or 'ai' (or 'mixed'/'manual'). */
+      source: ExtractorSource;
     }
   | { stage: 'uploading'; file: File }
   | { stage: 'importing' }
@@ -92,21 +111,65 @@ export function CsvImportWizard() {
           setState({ stage: 'error', message: t('errors.noHeaders') });
           return;
         }
-        const detection = detectColumns(headers);
-        setState({
-          stage: 'previewing',
-          file,
-          headers,
-          mapping: detection.mapping,
-          detectedBank: detection.detectedBank,
-          confidence: detection.confidence,
-          sampleRows: result.data.slice(0, SAMPLE_ROWS),
-        });
+        const sampleRows = result.data.slice(0, SAMPLE_ROWS);
+        setState({ stage: 'detecting', file, headers, sampleRows });
+        void runExtractor(file, headers, sampleRows);
       },
       error: () => {
         setState({ stage: 'error', message: t('errors.parseFailed') });
       },
     });
+  }
+
+  async function runExtractor(
+    file: File,
+    headers: string[],
+    sampleRows: Record<string, string>[],
+  ): Promise<void> {
+    /*
+     * POST headers + sample to the L1.7 endpoint. The orchestrator
+     * runs heuristic-first; if heuristic confidence is below
+     * threshold, the server calls Claude Haiku. Wizard sees the
+     * result either way as a uniform `ExtractorResult` shape.
+     */
+    try {
+      const res = await fetch('/api/v1/imports/parse', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ headers, sampleRows }),
+      });
+      if (!res.ok) {
+        setState({ stage: 'error', message: t('errors.detectFailed') });
+        return;
+      }
+      const result = (await res.json()) as ExtractorResult;
+      /*
+       * Fall back to GENERIC bank label when the orchestrator omits
+       * one (AI path doesn't emit detectedBank). The wizard's
+       * PreviewStep uses this only for the "Detectamos el formato de
+       * {bank}" headline copy.
+       */
+      const detectedBank: DetectedBank = result.detectedBank ?? 'GENERIC';
+      /*
+       * Fall back to an empty mapping when the orchestrator returns
+       * none (AI 'failed' path). The user starts with all-'ignore'
+       * dropdowns and assigns columns manually — the L1.8 validation
+       * gate prevents commit until a usable mapping is built.
+       */
+      const mapping: ColumnMapping = result.mapping ?? {};
+      setState({
+        stage: 'previewing',
+        file,
+        headers,
+        sampleRows,
+        mapping,
+        detectedBank,
+        confidence: result.overallConfidence,
+        source: result.source,
+      });
+    } catch {
+      setState({ stage: 'error', message: t('errors.detectFailed') });
+    }
   }
 
   async function handleImport(
@@ -177,6 +240,8 @@ export function CsvImportWizard() {
           onCancel={reset}
         />
       )}
+
+      {state.stage === 'detecting' && <ProgressStep label={t('progress.detecting')} />}
 
       {(state.stage === 'uploading' || state.stage === 'importing') && (
         <ProgressStep
