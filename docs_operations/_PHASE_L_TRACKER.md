@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L1 — Universal AI-assisted ingestion engine
-- **Active sub-batch:** L1.6 — DONE locally (orchestrator tests, 7/7), awaiting founder commit + push
-- **Last commit relevant to Phase L:** `b210340` (L1.5 ai-detect tests)
-- **Next concrete action:** Founder commits L1.6. After push, this doc advances to L1.6.5 (heuristic-detect tests) — required because L1.6 mocks the heuristic entirely and therefore does NOT pin its constants / signature-match behavior, contradicting the comment in heuristic-detect.ts that promises L1.6 pins them. L1.6.5 honors that promise.
-- **Blockers:** §6.1 still open (founder collecting samples) — affects L1.6.5 honest path; L1.6.5 can still ship against synthetic fixtures + the existing legacy detectColumns tests.
-- **Files in flight (uncommitted edits):** `src/lib/ingestion/extractor.test.ts` (new, ready to commit)
+- **Active sub-batch:** L1.6.5 — DONE locally (heuristic tests, 9/9), awaiting founder commit + push
+- **Last commit relevant to Phase L:** `b9e26fa` (L1.6 orchestrator tests)
+- **Next concrete action:** Founder commits L1.6.5 (`src/lib/ingestion/heuristic-detect.test.ts`, 9 passing tests). After push, this doc advances to L1.7 (`src/app/api/v1/imports/parse/route.ts` — server endpoint accepting a sampled CSV + returning ExtractorResult, called by the wizard for both heuristic-confident and AI-fallback paths).
+- **Blockers:** §6.1 still open. L1.7 unblocked (route doesn't need real bank samples).
+- **Files in flight (uncommitted edits):** `src/lib/ingestion/heuristic-detect.test.ts` (new, ready to commit)
 
 ---
 
@@ -89,8 +89,8 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L1.3** — `src/lib/ingestion/ai-detect.ts`: Claude Haiku call w/ cached system prompt + Zod-validated response · `4f6f518` · 2026-05-22
 - [x] **L1.4** — `src/lib/ingestion/extractor.ts`: orchestrator (heuristic → AI fallback when confidence < threshold) · `236d9f1` · 2026-05-22
 - [x] **L1.5** — `src/lib/ingestion/ai-detect.test.ts`: 6+ tests (happy, malformed JSON, low-confidence return, refusal, schema-violation, prompt-cache breakpoint check) — shipped 10 tests · `b210340` · 2026-05-22
-- [ ] **L1.6** — `src/lib/ingestion/extractor.test.ts`: 4+ tests (heuristic-confident path, AI-fallback path, AI-fails-fallback, empty-sample defensive) — shipped 7 tests _(awaiting push)_
-- [ ] **L1.6.5** — `src/lib/ingestion/heuristic-detect.test.ts`: pin `SIGNATURE_PER_COLUMN_CONFIDENCE` + `GENERIC_PER_COLUMN_CONFIDENCE` constants; signature-match → conf 1.0 (BAC, BANCO*INDUSTRIAL); generic keyword → conf 0.7; all-ignore headers → outcome 'fallback'; sample projection. *(Inserted because L1.6 mocks the heuristic entirely and therefore does not pin its behavior, contradicting heuristic-detect.ts's own comment promising L1.6 coverage.)\_
+- [x] **L1.6** — `src/lib/ingestion/extractor.test.ts`: 4+ tests (heuristic-confident path, AI-fallback path, AI-fails-fallback, empty-sample defensive) — shipped 7 tests · `b9e26fa` · 2026-05-22
+- [ ] **L1.6.5** — `src/lib/ingestion/heuristic-detect.test.ts`: pin `SIGNATURE_PER_COLUMN_CONFIDENCE` + `GENERIC_PER_COLUMN_CONFIDENCE` constants; signature-match → conf 1.0 (BAC, `BANCO_INDUSTRIAL`); generic keyword → conf 0.7; all-ignore headers → outcome 'fallback'; sample projection. _(Inserted because L1.6 mocks the heuristic entirely and therefore does not pin its behavior, contradicting heuristic-detect.ts's own comment promising L1.6 coverage.)_
 - [ ] **L1.7** — `src/app/api/v1/imports/parse/route.ts`: server endpoint accepting sample → returning ExtractorResult
 - [ ] **L1.8** — `src/components/imports/csv-import-wizard.tsx`: add "Confirma el mapeo" step + editable per-column dropdowns
 - [ ] **L1.9** — wire wizard to L1.7 endpoint (replace the in-wizard heuristic with a server call)
@@ -235,6 +235,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-05-22 — L1.6 closed — `b9e26fa` — extractor orchestrator tests (`src/lib/ingestion/extractor.test.ts`); 7 mocked-step tests pinning heuristic-confident skip, AI-fallback escalation, trace merge, failed-AI propagation, threshold boundary at 0.9
 - 2026-05-22 — L1.5 closed — `b210340` — ai-detect tests (`src/lib/ingestion/ai-detect.test.ts`); 10 mocked-Claude tests pinning the three locked guarantees (never-throws, sample-from-caller, hallucinated-header-filter) + request shape + cap
 - 2026-05-22 — L1.4 closed — `236d9f1` — extractor orchestrator (`src/lib/ingestion/extractor.ts`); `extractFromCsv` single entry point; `HEURISTIC_CONFIDENCE_THRESHOLD = 0.9`; heuristic-first w/ AI fallback when below threshold; trace merge
 - 2026-05-22 — L1.3 closed — `4f6f518` — Claude Haiku CSV column extractor (`src/lib/ingestion/ai-detect.ts`); tú-register Spanish system prompt w/ `cache_control: ephemeral`; Zod-validated response w/ defensive failure (never throws); hallucinated-header filter; cost telemetry in trace
