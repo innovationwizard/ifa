@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L1 — Universal AI-assisted ingestion engine
-- **Active sub-batch:** L1.1 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** _none yet_ — plan + tracker docs still uncommitted; L1.1 will be the second Phase L commit
-- **Next concrete action:** Founder commits the plan + tracker docs (if not already done), then commits L1.1's `src/lib/ingestion/types.ts`. After push, this doc updates to mark L1.1 closed in §3 + §5, and the active sub-batch advances to L1.2.
-- **Blockers:** §6.1 (sample collection) still blocks L1.5/L1.6 + L2.9. NOT blocking L1.2/L1.3/L1.4.
-- **Files in flight (uncommitted edits):** `src/lib/ingestion/types.ts` (new, ready to commit)
+- **Active sub-batch:** L1.2 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `0ce0925` (L1.1 types)
+- **Next concrete action:** Founder commits L1.2's `src/lib/ingestion/heuristic-detect.ts`. After push, this doc marks L1.2 closed in §3 + §5 and advances to L1.3 (`src/lib/ingestion/ai-detect.ts` — Claude Haiku extractor).
+- **Blockers:** §6.1 RESOLVED — founder is collecting samples in parallel (see §6). L1.3/L1.4 unblocked.
+- **Files in flight (uncommitted edits):** `src/lib/ingestion/heuristic-detect.ts` (new, ready to commit)
 
 ---
 
@@ -83,7 +83,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > See [\_PHASE_L_PLAN.md §2 L1](./_PHASE_L_PLAN.md#batch-l1--universal-ai-assisted-ingestion-engine-csv--ai-extractor--confidence--user-confirm)
 > for goal/architecture/acceptance.
 
-- [ ] **L1.1** — `src/lib/ingestion/types.ts`: `ExtractorResult`, `ColumnMapping`, `ColumnConfidence`, `ExtractorTrace` types
+- [x] **L1.1** — `src/lib/ingestion/types.ts`: `ExtractorResult`, `ColumnMapping`, `ColumnConfidence`, `ExtractorTrace` types · `0ce0925` · 2026-05-22
 - [ ] **L1.2** — `src/lib/ingestion/heuristic-detect.ts`: wraps existing `src/lib/imports/column-detect.ts`, adds explicit confidence score
 - [ ] **L1.3** — `src/lib/ingestion/ai-detect.ts`: Claude Haiku call w/ cached system prompt + Zod-validated response
 - [ ] **L1.4** — `src/lib/ingestion/extractor.ts`: orchestrator (heuristic → AI fallback when confidence < threshold)
@@ -233,7 +233,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
-_(empty — no sub-batches closed yet)_
+- 2026-05-22 — L1.1 closed — `0ce0925` — ingestion pipeline shared types (`src/lib/ingestion/types.ts`); re-exports `CanonicalField`/`ColumnMapping`/`DetectedBank` from existing column-detect; adds `ExtractorSource`, `ColumnConfidence`, `ExtractedRow`, `ExtractorStepTrace`, `ExtractorTrace`, `ExtractorResult`
 
 ---
 
