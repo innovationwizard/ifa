@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L1 — Universal AI-assisted ingestion engine
-- **Active sub-batch:** L1.3 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** `aa3ea88` (L1.2.5 projection helper)
-- **Next concrete action:** Founder commits L1.3 (`src/lib/ingestion/ai-detect.ts`). After push, this doc marks L1.3 closed and advances to L1.4 (`extractor.ts` orchestrator — chains heuristic → AI fallback when overallConfidence < threshold).
-- **Blockers:** §6.1 RESOLVED — founder collecting samples in parallel. L1.4 unblocked.
-- **Files in flight (uncommitted edits):** `src/lib/ingestion/ai-detect.ts` (new, ready to commit)
+- **Active sub-batch:** L1.4 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `4f6f518` (L1.3 ai-detect)
+- **Next concrete action:** Founder commits L1.4 (`src/lib/ingestion/extractor.ts`). After push, this doc marks L1.4 closed and advances to L1.5 (`ai-detect.test.ts`) — tests can run against synthetic fixtures + mocked Claude. Real-sample tests stay blocked on §6.1 until founder collects beta-user samples.
+- **Blockers:** §6.1 still open (founder collecting samples); affects HONEST L1.5/L1.6 coverage. Tests can still ship against synthetic fixtures.
+- **Files in flight (uncommitted edits):** `src/lib/ingestion/extractor.ts` (new, ready to commit)
 
 ---
 
@@ -86,7 +86,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L1.1** — `src/lib/ingestion/types.ts`: `ExtractorResult`, `ColumnMapping`, `ColumnConfidence`, `ExtractorTrace` types · `0ce0925` · 2026-05-22
 - [x] **L1.2** — `src/lib/ingestion/heuristic-detect.ts`: wraps existing `src/lib/imports/column-detect.ts`, adds explicit confidence score · `39d9f94` · 2026-05-22
 - [x] **L1.2.5** — `src/lib/ingestion/projection.ts`: extract the shared `projectCsvSample(rows, mapping) → ExtractedRow[]` helper so L1.3's ai-detect doesn't duplicate it. Refactor heuristic-detect to import from the shared module. _(Inserted between L1.2 and L1.3 when L1.3 surfaced the duplication.)_ · `aa3ea88` · 2026-05-22
-- [ ] **L1.3** — `src/lib/ingestion/ai-detect.ts`: Claude Haiku call w/ cached system prompt + Zod-validated response
+- [x] **L1.3** — `src/lib/ingestion/ai-detect.ts`: Claude Haiku call w/ cached system prompt + Zod-validated response · `4f6f518` · 2026-05-22
 - [ ] **L1.4** — `src/lib/ingestion/extractor.ts`: orchestrator (heuristic → AI fallback when confidence < threshold)
 - [ ] **L1.5** — `src/lib/ingestion/ai-detect.test.ts`: 6+ tests (happy, malformed JSON, low-confidence return, refusal, schema-violation, prompt-cache breakpoint check)
 - [ ] **L1.6** — `src/lib/ingestion/extractor.test.ts`: 4+ tests (heuristic-confident path, AI-fallback path, AI-fails-fallback, empty-sample defensive)
@@ -234,6 +234,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-05-22 — L1.3 closed — `4f6f518` — Claude Haiku CSV column extractor (`src/lib/ingestion/ai-detect.ts`); tú-register Spanish system prompt w/ `cache_control: ephemeral`; Zod-validated response w/ defensive failure (never throws); hallucinated-header filter; cost telemetry in trace
 - 2026-05-22 — L1.2.5 closed — `aa3ea88` — extract `projectCsvSample` shared helper (`src/lib/ingestion/projection.ts`); refactor heuristic-detect to import; pre-emptive de-dup before L1.3's ai-detect would have duplicated
 - 2026-05-22 — L1.2 closed — `39d9f94` — heuristic-detect wrapper (`src/lib/ingestion/heuristic-detect.ts`); adapts legacy `detectColumns` → `ExtractorResult`; per-column confidence (signature=1.0, generic=0.7); sample projection from `Record<header,cell>[]` → `ExtractedRow[]`; trace step
 - 2026-05-22 — L1.1 closed — `0ce0925` — ingestion pipeline shared types (`src/lib/ingestion/types.ts`); re-exports `CanonicalField`/`ColumnMapping`/`DetectedBank` from existing column-detect; adds `ExtractorSource`, `ColumnConfidence`, `ExtractedRow`, `ExtractorStepTrace`, `ExtractorTrace`, `ExtractorResult`
