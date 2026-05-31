@@ -54,12 +54,12 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > **The only block in this file that changes between sub-batches.**
 > Keep it terse and concrete.
 
-- **Active batch:** _none yet_ — Phase L not started
-- **Active sub-batch:** _none yet_
-- **Last commit relevant to Phase L:** _none yet_ — head is the plan doc commit (`<pending>` when committed)
-- **Next concrete action:** Founder resolves the 6 open questions in [\_PHASE_L_PLAN.md §6](./_PHASE_L_PLAN.md#6-open-questions), at minimum the ones blocking L1 (Q1: bank-sample collection strategy). After that, begin L1.1.
-- **Blockers:** Open questions §6.1 (sample collection) blocks L1.5/L1.6 (tests against real data) but not L1.1–L1.4 (foundation code can proceed against fixtures).
-- **Files in flight (uncommitted edits):** none
+- **Active batch:** L1 — Universal AI-assisted ingestion engine
+- **Active sub-batch:** L1.1 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** _none yet_ — plan + tracker docs still uncommitted; L1.1 will be the second Phase L commit
+- **Next concrete action:** Founder commits the plan + tracker docs (if not already done), then commits L1.1's `src/lib/ingestion/types.ts`. After push, this doc updates to mark L1.1 closed in §3 + §5, and the active sub-batch advances to L1.2.
+- **Blockers:** §6.1 (sample collection) still blocks L1.5/L1.6 + L2.9. NOT blocking L1.2/L1.3/L1.4.
+- **Files in flight (uncommitted edits):** `src/lib/ingestion/types.ts` (new, ready to commit)
 
 ---
 
@@ -243,10 +243,18 @@ Items requiring founder input or external action before specific
 sub-batches can proceed. Cross-referenced to
 [\_PHASE_L_PLAN.md §6](./_PHASE_L_PLAN.md#6-open-questions).
 
-- **§6.1 — Bank-sample collection strategy** (blocks L1.5/L1.6
-  honest testing + L2.9 entirely): does the founder collect
-  CSV/PDF samples from 3–5 beta users before L1 begins, or use
-  founder's own statements?
+- ~~**§6.1 — Bank-sample collection strategy**~~ **RESOLVED 2026-05-22:**
+  Founder collects CSV + PDF samples from 3–5 beta users BEFORE
+  L1.5/L1.6 begin. Outreach runs IN PARALLEL with my L1.2–L1.4
+  implementation work. Samples land in `tests/fixtures/bank-statements/`
+  (CSV) and `tests/fixtures/pdf-statements/` (PDF) with a README
+  per directory naming each bank. **Founder action open** — track
+  outreach progress here:
+  - [ ] User 1 sample collected — bank: \_\_\_
+  - [ ] User 2 sample collected — bank: \_\_\_
+  - [ ] User 3 sample collected — bank: \_\_\_
+  - [ ] User 4 sample collected — bank: \_\_\_ (optional)
+  - [ ] User 5 sample collected — bank: \_\_\_ (optional)
 - **§6.2 — Email-change re-auth required?** (blocks L3.4): yes
   by default; confirm in-batch.
 - **§6.3 — Supabase vs custom password-reset email** (blocks
