@@ -354,29 +354,40 @@ function IdleStep({
 }) {
   const t = useTranslations('imports');
   return (
-    <label
-      className="border-ifa-gray-300 hover:border-ifa-teal-400 focus-within:border-ifa-teal-600 rounded-ifa-card flex cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed p-10 text-center transition-colors"
-      htmlFor="csv-file"
-    >
-      <div className="bg-ifa-teal-100 text-ifa-teal-600 flex size-16 items-center justify-center rounded-full">
-        <FileUp className="size-7" aria-hidden />
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-ifa-navy-900 text-base font-medium">{t('upload.prompt')}</span>
-        <span className="text-ifa-gray-500 text-xs">{t('upload.hint')}</span>
-      </div>
-      <input
-        ref={inputRef}
-        id="csv-file"
-        type="file"
-        accept=".csv,text/csv,.pdf,application/pdf"
-        className="sr-only"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onChoose(file);
-        }}
-      />
-    </label>
+    <div className="flex flex-col gap-3">
+      <label
+        className="border-ifa-gray-300 hover:border-ifa-teal-400 focus-within:border-ifa-teal-600 rounded-ifa-card flex cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed p-10 text-center transition-colors"
+        htmlFor="csv-file"
+      >
+        <div className="bg-ifa-teal-100 text-ifa-teal-600 flex size-16 items-center justify-center rounded-full">
+          <FileUp className="size-7" aria-hidden />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-ifa-navy-900 text-base font-medium">{t('upload.prompt')}</span>
+          <span className="text-ifa-gray-500 text-xs">{t('upload.hint')}</span>
+        </div>
+        <input
+          ref={inputRef}
+          id="csv-file"
+          type="file"
+          accept=".csv,text/csv,.pdf,application/pdf"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) onChoose(file);
+          }}
+        />
+      </label>
+      {/*
+       * Out-of-dropzone tip for the "my bank only has a web page"
+       * case. Lives below the dropzone (not inside the <label>) so
+       * a click on the tip text doesn't accidentally open the file
+       * picker.
+       */}
+      <p className="text-ifa-gray-500 px-2 text-center text-xs leading-snug">
+        {t('pdfHelp.printTip')}
+      </p>
+    </div>
   );
 }
 
