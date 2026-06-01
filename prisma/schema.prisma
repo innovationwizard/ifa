@@ -185,6 +185,20 @@ model Profile {
   /// avoids JSONB juggling in `metadata`.
   lastHealthScoreRecomputeAt DateTime?
 
+  /// Soft-delete tombstone (Phase L3.1). Set by the user-triggered
+  /// account-deletion flow (Phase L3.7). All Profile lookups inside
+  /// the app filter `deletedAt: null` so a deleted Profile is
+  /// invisible to its former owner and to any joins (transactions,
+  /// health scores, etc.). The Profile row stays on disk so the
+  /// audit trail + accounting record survive — hard-delete /
+  /// retention purges are a separate post-MVP concern per
+  /// scaffolding §S-9.7.
+  ///
+  /// Why null-default + nullable: the absence of a tombstone is the
+  /// common case (>99.9% of rows). A boolean `deleted` would lose
+  /// the "when" signal; this column gives us both.
+  deletedAt DateTime?
+
   members ProfileMember[]
 
   @@index([type])
@@ -231,6 +245,14 @@ model ProfileMember {
   role      MemberRole
   invitedAt DateTime   @default(now())
   joinedAt  DateTime?
+  /// Soft-delete tombstone (Phase L3.1). Set by L3.7's
+  /// `softDelete(profileId)` cascade — when a Profile is
+  /// soft-deleted, every membership for it is too, so a user
+  /// who's a member of multiple profiles (Canal Contable
+  /// future) cleanly loses access to just the deleted one.
+  /// All ProfileMember lookups inside the app filter
+  /// `deletedAt: null` — same convention as Profile.
+  deletedAt DateTime?
 
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)

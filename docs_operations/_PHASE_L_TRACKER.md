@@ -54,13 +54,12 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > **The only block in this file that changes between sub-batches.**
 > Keep it terse and concrete.
 
-- **Active batch:** **L2 CLOSED PARTIALLY** via L2.11. Next batch: L3 — Settings (account hygiene).
-- **Active sub-batch:** L2.11 — partial batch closure (DONE locally, tracker-only)
-- **Last commit relevant to Phase L:** `6c7adb7` (L2.8 structural pdf tests). L2.11 is the next commit and closes L2 (partial).
-- **Next concrete action:** Founder commits L2.11 (tracker-only). After push, this doc advances to L3.1 (schema: add `Profile.deletedAt` + `ProfileMember.deletedAt` if not already there; `pnpm db:push`).
-- **Blockers:** §6.1 (real-bank samples) — L2.9/L2.10/L2.8.5 carried forward, NOT in L3's path. L3 unblocked.
-- **Files in flight (uncommitted edits):** `docs_operations/_PHASE_L_TRACKER.md` (this file — L2.11 closes batch in §3 + §5).
-- **L2 partial gate sweep:** typecheck ✓ | lint 0 errors / 6 pre-existing warnings ✓ | prettier ✓ on L2 files | vitest **619/619** ✓ (+22 from L2) | next build ✓ | playwright chromium **41/41** ✓ (no new e2e from L2 — L2.10 deferred). **3 sub-batches carried forward as documented debt**: L2.9 (founder samples), L2.10 (PDF e2e), L2.8.5 (real-fixture pdf tests). All blocked on §6.1.
+- **Active batch:** L3 — Settings (account hygiene)
+- **Active sub-batch:** L3.1 — DONE locally (schema edits + `db:format` + `db:generate`), awaiting founder commit + push + `pnpm db:push` against prod
+- **Last commit relevant to Phase L:** `ef79340` (L2.11 partial batch closure)
+- **Next concrete action:** Founder commits L3.1 (schema additive change), pushes, then **runs `pnpm db:push` against the prod Supabase** to sync the two new nullable columns (safe — both `DateTime?` no-default, no data loss). After push + db sync, this doc advances to L3.2 (`src/app/(app)/configuracion/page.tsx` shell with 4 section placeholders).
+- **Blockers:** §6.1 (real-bank samples) — carried forward, not in L3 path. L3.2+ unblocked once schema lands on prod.
+- **Files in flight (uncommitted edits):** `prisma/schema.prisma` (+`deletedAt` on Profile + ProfileMember). Prisma client regenerated locally; the regen reaches CI/prod via `pnpm install` or the deploy pipeline's `db:generate` step.
 
 ---
 
@@ -240,7 +239,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
-- 2026-06-01 — **L2 BATCH CLOSED PARTIALLY via L2.11** — 8 sub-batches shipped (L2.1 → L2.8 + L2.6.5). 3 sub-batches carried forward as documented debt: L2.8.5 (real-fixture pdf-extract tests), L2.9 (founder samples), L2.10 (PDF e2e). All blocked on §6.1 founder outreach. Full partial gate sweep: vitest 619/619, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L2: pdf-extract module + ai-detect prose-mode + extractor PDF entry + parse-pdf route + 4 test files + 3 i18n keys + wizard PDF branch + 1 dep (unpdf) + 1 deep-research-driven decision doc. PDF preview-UI adaptation noted as known-limitation post-L2.
+- 2026-06-01 — **L2 BATCH CLOSED PARTIALLY via L2.11** — `ef79340` — 8 sub-batches shipped (L2.1 → L2.8 + L2.6.5). 3 sub-batches carried forward as documented debt: L2.8.5 (real-fixture pdf-extract tests), L2.9 (founder samples), L2.10 (PDF e2e). All blocked on §6.1 founder outreach. Full partial gate sweep: vitest 619/619, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L2: pdf-extract module + ai-detect prose-mode + extractor PDF entry + parse-pdf route + 4 test files + 3 i18n keys + wizard PDF branch + 1 dep (unpdf) + 1 deep-research-driven decision doc. PDF preview-UI adaptation noted as known-limitation post-L2.
 - 2026-06-01 — L2.8 closed — `6c7adb7` — structural PDF tests (`src/lib/ingestion/pdf-extract.test.ts` new + `extractor.test.ts` extended); 11 new tests pinning pdf-extract's pure-transformation contract (happy, empty, errors-propagate w/ ORIGINAL Error instance) + extractFromPdf branch (trace merge, empty-pages 'fallback' vs 'matched', orchestrator re-throws). 37/37 ingestion tests pass. Real-fixture coverage deferred to L2.8.5.
 - 2026-06-01 — L2.7 closed — `69e62d4` — print-to-PDF tip in IdleStep (`src/messages/es-GT.json` + `src/components/imports/csv-import-wizard.tsx`); single `imports.pdfHelp.printTip` key in tú-register Spanish + `<p>` below the dropzone covering the "printable web pages" case. Scope smaller than original `imports.pdfHelp.*` block plan because L2.5 already covered `upload.prompt/hint`; remaining PDF i18n deferred post-L2.
 - 2026-06-01 — L2.6.5 closed — `1591262` — parse-pdf route tests (`src/app/api/v1/imports/parse-pdf/route.test.ts`); 11 mocked-extractor tests pinning auth gating (401/400; extractor NOT called), content-type guard (rejects JSON, accepts suffix + case-insensitive), body guards (empty 400, oversize 413), extractor-throws → 400 `pdf_extract_failed` with message echo (incl. non-Error throw via String(err) for defense), happy path (200 ExtractorResult shape preserved + body forwarded as Uint8Array).
