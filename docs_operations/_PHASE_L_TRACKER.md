@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L2 — PDF ingestion via the L1 pipeline
-- **Active sub-batch:** L2.7 — DONE locally (i18n + IdleStep tip), awaiting founder commit + push
-- **Last commit relevant to Phase L:** `1591262` (L2.6.5 route tests)
-- **Next concrete action:** Founder commits L2.7. After push, this doc advances to L2.8 (`pdf-extract.test.ts` + extend extractor tests for PDF input path) — **but L2.8/L2.9/L2.10 wait on §6.1 (real-bank PDF samples)**. Founder action: collect 2–3 anonymized PDF samples from beta users (already tracked in §6 outreach checklist). If samples aren't ready, L2.8 can ship structural-only tests (extractor PDF-branch happy/failure paths with mocked unpdf) and the real-fixture tests follow when samples land. Decide approach on entry to L2.8.
-- **Blockers:** §6.1 (real-bank samples) — load-bearing for L2.8/L2.9/L2.10. L2.8 partially unblocked (structural tests possible without samples).
-- **Files in flight (uncommitted edits):** `src/messages/es-GT.json` (added `imports.pdfHelp.printTip`) + `src/components/imports/csv-import-wizard.tsx` (IdleStep wraps the dropzone + adds a tip `<p>` below)
+- **Active sub-batch:** L2.8 — DONE locally (37/37 ingestion tests pass; +11 new for PDF paths), awaiting founder commit + push
+- **Last commit relevant to Phase L:** `69e62d4` (L2.7 print-to-PDF tip)
+- **Next concrete action:** Founder commits L2.8 (`src/lib/ingestion/pdf-extract.test.ts` new + `src/lib/ingestion/extractor.test.ts` extended). After push, this doc advances to L2.9 (collect real-bank PDF samples) — gated on **§6.1 founder outreach**. L2.9 is a founder action (collect 2–3 anonymized PDF samples + drop into `tests/fixtures/pdf-statements/` with a README per bank). After L2.9 lands fixtures, L2.10 (e2e for PDF flow) becomes possible AND L2.8.5 (real-fixture pdf-extract tests against fixtures) follows.
+- **Blockers:** §6.1 (real-bank samples) — load-bearing for L2.9 (founder action), L2.10, L2.8.5.
+- **Files in flight (uncommitted edits):** `src/lib/ingestion/pdf-extract.test.ts` (new, 6 tests) + `src/lib/ingestion/extractor.test.ts` (extended, +5 PDF-branch tests; all suites still green).
 
 ---
 
@@ -113,8 +113,9 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L2.5** — `src/components/imports/csv-import-wizard.tsx` (extend): widen `<input accept>` to include `.pdf`, branch parse step on MIME type · `9c70c7c` · 2026-06-01
 - [x] **L2.6** — `src/app/api/v1/imports/parse-pdf/route.ts`: server endpoint accepting PDF upload → returning ExtractorResult. _5s hard timeout omitted — Vercel function runtime ceiling handles long extractions; soft per-route timeout judged overengineering for MVP._ · `0e63894` · 2026-06-01
 - [x] **L2.6.5** — `src/app/api/v1/imports/parse-pdf/route.test.ts`: auth gating (401 anon, 400 `no_profile`), content-type/empty/oversize body guards (400/400/413), `pdf_extract_failed` (400 when extractor throws), happy path (200 with orchestrator result). _(Inserted because L2.6 lands without a route-test sibling — mirrors L1.7.5's insert pattern.)_ · `1591262` · 2026-06-01
-- [ ] **L2.7** — `src/messages/es-GT.json`: `imports.pdfHelp.*` block (incl. "guardar como PDF" guidance for printable web pages)
-- [ ] **L2.8** — `src/lib/ingestion/pdf-extract.test.ts` + extend extractor tests for PDF input path
+- [x] **L2.7** — `src/messages/es-GT.json`: `imports.pdfHelp.*` block (incl. "guardar como PDF" guidance for printable web pages) — shipped `imports.pdfHelp.printTip` + IdleStep render; rest of block deferred post-L2 (L2.5 already covered upload.prompt/hint). · `69e62d4` · 2026-06-01
+- [ ] **L2.8** — `src/lib/ingestion/pdf-extract.test.ts` + extend extractor tests for PDF input path. _Structural-only scope (founder decision 2026-06-01); mocks unpdf and the orchestrator's collaborators. Real-fixture tests follow as L2.8.5 when §6.1 samples land._
+- [ ] **L2.8.5** — Real-fixture pdf-extract tests against anonymized GT bank PDFs. _Blocked on §6.1 founder outreach. When samples arrive, add a `tests/fixtures/pdf-statements/` directory with one README per bank + the structural mocked tests get a sibling test file exercising real `unpdf.extractText` against the fixtures._
 - [ ] **L2.9** — **Founder action:** collect 2–3 anonymized real PDF samples from beta users; add to `tests/fixtures/pdf-statements/` with a README naming the bank for each
 - [ ] **L2.10** — `tests/e2e/imports-pdf.spec.ts`: e2e spec uploading a fixture PDF → confirm step → commit
 - [ ] **L2.11** — Gate sweep + tracker update + commit
@@ -238,6 +239,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-06-01 — L2.7 closed — `69e62d4` — print-to-PDF tip in IdleStep (`src/messages/es-GT.json` + `src/components/imports/csv-import-wizard.tsx`); single `imports.pdfHelp.printTip` key in tú-register Spanish + `<p>` below the dropzone covering the "printable web pages" case. Scope smaller than original `imports.pdfHelp.*` block plan because L2.5 already covered `upload.prompt/hint`; remaining PDF i18n deferred post-L2.
 - 2026-06-01 — L2.6.5 closed — `1591262` — parse-pdf route tests (`src/app/api/v1/imports/parse-pdf/route.test.ts`); 11 mocked-extractor tests pinning auth gating (401/400; extractor NOT called), content-type guard (rejects JSON, accepts suffix + case-insensitive), body guards (empty 400, oversize 413), extractor-throws → 400 `pdf_extract_failed` with message echo (incl. non-Error throw via String(err) for defense), happy path (200 ExtractorResult shape preserved + body forwarded as Uint8Array).
 - 2026-06-01 — L2.6 closed — `0e63894` — parse-pdf route (`src/app/api/v1/imports/parse-pdf/route.ts`); POST raw `application/pdf` body → `extractFromPdf` → `ExtractorResult` JSON; auth gating 401/400, content-type guard 400, empty/oversize body 400/413, `pdf_extract_failed` 400 (extractor throws). 200 even on AI-failed path (wizard branches). No Zod (binary body), no soft timeout (Vercel ceiling).
 - 2026-06-01 — L2.5 closed — `9c70c7c` — wizard accepts PDF + branches by MIME (`src/components/imports/csv-import-wizard.tsx`); `isPdfFile` helper (MIME-first, filename-extension fallback); `<input accept>` widened; new `runPdfExtractor` POSTs raw bytes to `/api/v1/imports/parse-pdf` (404 until L2.6); preview-UI adaptation for PDF deferred as known-limitation post-L2.6; +2 i18n key updates (`upload.prompt`, `upload.hint`).
