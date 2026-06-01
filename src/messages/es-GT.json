@@ -663,6 +663,29 @@
       "earlySupporterBadge": "Eres Early Supporter"
     }
   },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Tu cuenta, tus datos y tu privacidad.",
+    "sections": {
+      "profile": {
+        "title": "Perfil",
+        "description": "Tu nombre y datos básicos."
+      },
+      "account": {
+        "title": "Cuenta",
+        "description": "Correo, contraseña y acceso."
+      },
+      "data": {
+        "title": "Tus datos",
+        "description": "Descarga todo lo que tenemos guardado de ti."
+      },
+      "delete": {
+        "title": "Eliminar mi cuenta",
+        "description": "Borra tu cuenta y tus datos. Esto no se puede deshacer."
+      }
+    },
+    "placeholderSoon": "Próximamente"
+  },
   "errors": {
     "generic": {
       "title": "Algo salió mal",

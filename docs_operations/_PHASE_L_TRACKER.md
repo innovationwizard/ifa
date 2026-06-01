@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L3 — Settings (account hygiene)
-- **Active sub-batch:** L3.1 — DONE locally (schema edits + `db:format` + `db:generate`), awaiting founder commit + push + `pnpm db:push` against prod
-- **Last commit relevant to Phase L:** `ef79340` (L2.11 partial batch closure)
-- **Next concrete action:** Founder commits L3.1 (schema additive change), pushes, then **runs `pnpm db:push` against the prod Supabase** to sync the two new nullable columns (safe — both `DateTime?` no-default, no data loss). After push + db sync, this doc advances to L3.2 (`src/app/(app)/configuracion/page.tsx` shell with 4 section placeholders).
-- **Blockers:** §6.1 (real-bank samples) — carried forward, not in L3 path. L3.2+ unblocked once schema lands on prod.
-- **Files in flight (uncommitted edits):** `prisma/schema.prisma` (+`deletedAt` on Profile + ProfileMember). Prisma client regenerated locally; the regen reaches CI/prod via `pnpm install` or the deploy pipeline's `db:generate` step.
+- **Active sub-batch:** L3.2 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `2212dfb` (L3.1 schema additions)
+- **Next concrete action:** Founder commits L3.2 (`/configuracion` shell + i18n + e2e). After push, this doc advances to L3.3 (`profile-card` — displayName / dpiNumber / dob form + `updateProfile` server action). L3.3 is the first sub-batch that touches Profile fields beyond what L3.2's auth check already does; no DB schema dependency on L3.1's new columns yet (those land in L3.7's softDelete).
+- **Blockers:** db:push against prod still pending — flagged separately in chat. L3.2 doesn't touch the new deletedAt columns; L3.3 doesn't either. The L3.1 schema becomes load-bearing at L3.7 + L3.8.
+- **Files in flight (uncommitted edits):** `src/app/(app)/configuracion/page.tsx` (replaced ModulePlaceholder with the 4-section shell) + `src/messages/es-GT.json` (new `settings.*` block) + `tests/e2e/configuracion.spec.ts` (new auth-proxy spec).
 
 ---
 
@@ -126,7 +126,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 
 > See [\_PHASE_L_PLAN.md §2 L3](./_PHASE_L_PLAN.md#batch-l3--settings-page-account-hygiene).
 
-- [ ] **L3.1** — Schema: add `Profile.deletedAt` + `ProfileMember.deletedAt` if not already there; `pnpm db:push`
+- [x] **L3.1** — Schema: add `Profile.deletedAt` + `ProfileMember.deletedAt` if not already there; `pnpm db:push` _(code shipped; `db:push` against prod is a founder action that follows the push)_ · `2212dfb` · 2026-06-01
 - [ ] **L3.2** — `src/app/(app)/configuracion/page.tsx`: shell with 4 sections
 - [ ] **L3.3** — `src/components/settings/profile-card.tsx` + `updateProfile` action
 - [ ] **L3.4** — `src/components/settings/account-card.tsx`: email change flow (re-auth required)
