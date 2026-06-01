@@ -237,8 +237,8 @@
     "subtitle": "Agarra el archivo CSV de tu banco y lo leemos por ti. Aceptamos el formato de BAC y Banco Industrial automáticamente.",
     "breadcrumb": "Importar",
     "upload": {
-      "prompt": "Haz clic para elegir un archivo CSV",
-      "hint": "Hasta 10 MB por archivo"
+      "prompt": "Haz clic para elegir un archivo CSV o PDF",
+      "hint": "Hasta 10 MB por archivo. Aceptamos CSV y PDF de tu banco."
     },
     "preview": {
       "detected": "Detectamos el formato de {bank}",

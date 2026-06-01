@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L2 — PDF ingestion via the L1 pipeline
-- **Active sub-batch:** L2.4 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** `abc9fac` (L2.3 ai-detect prose mode)
-- **Next concrete action:** Founder commits L2.4 (`src/lib/ingestion/extractor.ts` + `src/lib/ingestion/types.ts`). After push, this doc advances to L2.5 — widen the wizard's `<input accept>` to include `.pdf`, branch the parse path on MIME type (CSV → papaparse client-side then POST `/api/v1/imports/parse`; PDF → POST raw bytes to the L2.6 endpoint that lands next).
-- **Blockers:** §6.1 (real-bank samples) — load-bearing for L2.8/L2.9/L2.10.
-- **Files in flight (uncommitted edits):** `src/lib/ingestion/extractor.ts` (modified — `extractFromPdf` added) + `src/lib/ingestion/types.ts` (modified — `ExtractorStepTrace.step` union extended with `'pdf'`)
+- **Active sub-batch:** L2.5 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `651ca78` (L2.4 extractFromPdf orchestrator)
+- **Next concrete action:** Founder commits L2.5 (wizard widen + MIME branch + `runPdfExtractor`). After push, this doc advances to L2.6 — build `src/app/api/v1/imports/parse-pdf/route.ts`: POST accepts raw PDF body (`content-type: application/pdf`), reads bytes, calls `extractFromPdf`, returns the orchestrator result. Auth-gated 401/400, body-too-large guard, error mapping for unpdf throws (corrupt/encrypted/non-PDF → 400 with structured code).
+- **Blockers:** §6.1 (real-bank samples) — load-bearing for L2.8/L2.9/L2.10. PDF preview-UI adaptation is a KNOWN LIMITATION pending after L2.6 — currently a PDF upload would land on PreviewStep with empty headers/sampleRows, rendering an empty table; harmless for L2.5's atomic scope.
+- **Files in flight (uncommitted edits):** `src/components/imports/csv-import-wizard.tsx` (modified — `isPdfFile` helper, `<input accept>` widened, `handleFileChosen` MIME-branch, new `runPdfExtractor`) + `src/messages/es-GT.json` (modified — `imports.upload.prompt` + `imports.upload.hint` mention PDF)
 
 ---
 
@@ -109,7 +109,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L2.1** — Choose PDF lib (pdf-parse vs pdfjs-dist) + add dep; document choice in a comment. _Decision (2026-06-01): **unpdf** picked over pdfjs-dist-direct + pdf-parse after `deep-research` workflow report (101 agents, 25 verified claims). Full rationale in [\_PDF_LIB_RESEARCH.md](./_PDF_LIB_RESEARCH.md). Added unpdf@^1.6.2._ · `5f58479` · 2026-06-01
 - [x] **L2.2** — `src/lib/ingestion/pdf-extract.ts`: pure server-side PDF buffer → text rows transformation · `35bbbca` · 2026-06-01
 - [x] **L2.3** — `src/lib/ingestion/ai-detect.ts` (extend): add "prose-mode" system prompt for free-text → structured rows (cached separately from CSV mode) · `abc9fac` · 2026-06-01
-- [ ] **L2.4** — `src/lib/ingestion/extractor.ts` (extend): add `extractFromPdf(buffer)` entry that chains pdf-extract → ai-detect prose-mode
+- [x] **L2.4** — `src/lib/ingestion/extractor.ts` (extend): add `extractFromPdf(buffer)` entry that chains pdf-extract → ai-detect prose-mode · `651ca78` · 2026-06-01
 - [ ] **L2.5** — `src/components/imports/csv-import-wizard.tsx` (extend): widen `<input accept>` to include `.pdf`, branch parse step on MIME type
 - [ ] **L2.6** — `src/app/api/v1/imports/parse-pdf/route.ts`: server endpoint accepting PDF upload → returning ExtractorResult. 5s hard timeout.
 - [ ] **L2.7** — `src/messages/es-GT.json`: `imports.pdfHelp.*` block (incl. "guardar como PDF" guidance for printable web pages)
@@ -237,6 +237,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-06-01 — L2.4 closed — `651ca78` — extractor orchestrator gains PDF entry (`src/lib/ingestion/extractor.ts`); new `extractFromPdf(buffer)` chains pdf-extract → aiDetectProse + merges traces. Types union extended: `ExtractorStepTrace.step` now `'heuristic' | 'ai' | 'pdf'`. Throws semantics documented at file level: extractFromCsv never throws; extractFromPdf MAY throw on corrupt/encrypted PDFs (route catches).
 - 2026-06-01 — L2.3 closed — `abc9fac` — ai-detect grows prose mode (`src/lib/ingestion/ai-detect.ts`); CSV constants renamed (`SYSTEM_PROMPT` → `SYSTEM_PROMPT_CSV`, `AiResponseSchema` → `AiCsvResponseSchema`); shared `PerFieldConfidenceSchema` + `NotesSchema` extracted; new `aiDetectProse({pages})` with caps (20 pages × 4000 chars × 30 rows); empty-pages short-circuits to failed without a Claude call; same defensive failure contract. Existing 10 CSV tests still pass.
 - 2026-06-01 — L2.2 closed — `35bbbca` — pdf-extract.ts (`src/lib/ingestion/pdf-extract.ts`); pure async `extractPdfText(buffer) → {pages: string[], totalPages, durationMs}` wrapping `unpdf.extractText`. Locked: errors propagate (opposite of ai-detect's never-throw contract — PDF parsing failures are user-action errors). Tests deferred to L2.8.
 - 2026-06-01 — L2.1 closed — `5f58479` — chose `unpdf@^1.6.2` over pdfjs-dist-direct + pdf-parse via the `deep-research` workflow (101 agents, 25 adversarially-verified claims, 20 confirmed / 5 killed). Full report at `docs_operations/_PDF_LIB_RESEARCH.md`. Open question (load-bearing for L2.8–L2.10): zero GT-specific empirical evidence — must test against real BAC/Industrial/Banrural samples via §6.1 founder outreach.

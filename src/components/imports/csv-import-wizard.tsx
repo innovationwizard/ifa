@@ -92,6 +92,18 @@ interface PrepareResponse {
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const SAMPLE_ROWS = 10;
 
+/**
+ * Detect PDF input — prefer the browser-set MIME, fall back to a
+ * case-insensitive filename-extension check for browsers (Safari,
+ * older Firefox) that don't always populate `file.type` for
+ * `application/pdf`. CSV is the assumed default for non-PDF files;
+ * a malformed CSV will error inside papaparse downstream.
+ */
+function isPdfFile(file: File): boolean {
+  if (file.type === 'application/pdf') return true;
+  return file.name.toLowerCase().endsWith('.pdf');
+}
+
 export function CsvImportWizard() {
   const t = useTranslations('imports');
   const router = useRouter();
@@ -106,6 +118,18 @@ export function CsvImportWizard() {
   function handleFileChosen(file: File): void {
     if (file.size > MAX_FILE_BYTES) {
       setState({ stage: 'error', message: t('errors.fileTooLarge') });
+      return;
+    }
+    /*
+     * Branch on MIME (preferred) with a filename-extension fallback
+     * for browsers that don't set `file.type` for `.csv` uploads
+     * (Safari has historically been spotty). PDF takes the
+     * server-side path: no client-side PDF parsing (security +
+     * perf — locked in [\_PHASE_L_PLAN.md] L2's design notes).
+     */
+    if (isPdfFile(file)) {
+      setState({ stage: 'detecting', file, headers: [], sampleRows: [] });
+      void runPdfExtractor(file);
       return;
     }
     Papa.parse<Record<string, string>>(file, {
@@ -172,6 +196,47 @@ export function CsvImportWizard() {
         sampleRows,
         mapping,
         detectedBank,
+        confidence: result.overallConfidence,
+        source: result.source,
+        perFieldConfidence: result.confidence,
+      });
+    } catch {
+      setState({ stage: 'error', message: t('errors.detectFailed') });
+    }
+  }
+
+  async function runPdfExtractor(file: File): Promise<void> {
+    /*
+     * POST raw PDF bytes to the L2.6 endpoint. The orchestrator
+     * (extractFromPdf, L2.4) runs unpdf's text extraction then
+     * Claude Haiku prose-mode and returns a uniform `ExtractorResult`
+     * with `mapping: undefined` (PDFs have no source headers).
+     *
+     * KNOWN LIMITATION (post-L2.5): the wizard's PreviewStep
+     * renders `state.sampleRows` indexed by `state.headers` — both
+     * empty for PDFs. The preview-step UI adaptation for PDF (which
+     * should render the AI-extracted canonical rows directly,
+     * not a header→cell grid) is a separate sub-batch tracked
+     * after L2.6 lands.
+     */
+    try {
+      const res = await fetch('/api/v1/imports/parse-pdf', {
+        method: 'POST',
+        headers: { 'content-type': 'application/pdf' },
+        body: file,
+      });
+      if (!res.ok) {
+        setState({ stage: 'error', message: t('errors.detectFailed') });
+        return;
+      }
+      const result = (await res.json()) as ExtractorResult;
+      setState({
+        stage: 'previewing',
+        file,
+        headers: [],
+        sampleRows: [],
+        mapping: result.mapping ?? {},
+        detectedBank: result.detectedBank ?? 'GENERIC',
         confidence: result.overallConfidence,
         source: result.source,
         perFieldConfidence: result.confidence,
@@ -304,7 +369,7 @@ function IdleStep({
         ref={inputRef}
         id="csv-file"
         type="file"
-        accept=".csv,text/csv"
+        accept=".csv,text/csv,.pdf,application/pdf"
         className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0];
