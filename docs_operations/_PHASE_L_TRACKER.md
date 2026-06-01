@@ -54,13 +54,12 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > **The only block in this file that changes between sub-batches.**
 > Keep it terse and concrete.
 
-- **Active batch:** **L1 CLOSED** as of L1.12. Next batch: L2 — PDF ingestion via the L1 pipeline.
-- **Active sub-batch:** L1.12 — DONE locally (tracker-only), awaiting founder commit + push.
-- **Last commit relevant to Phase L:** `0fffe74` (L1.11 e2e auth spec). L1.12 is the next commit and closes the batch.
-- **Next concrete action:** Founder commits L1.12 (tracker-only — `docs_operations/_PHASE_L_TRACKER.md`). After push, this doc advances to L2.1 (choose PDF lib + add dep). §6.1 (real-bank samples) becomes load-bearing for L2.9 — founder's parallel outreach should land samples before L2.8 (`pdf-extract.test.ts`) ships.
-- **Blockers:** §6.1 (real-bank samples) — now load-bearing for L2.8/L2.9/L2.10.
-- **Files in flight (uncommitted edits):** `docs_operations/_PHASE_L_TRACKER.md` (this file — L1.12's tracker close + history entry)
-- **L1 final gate sweep:** typecheck ✓ | lint 0 errors / 6 pre-existing warnings ✓ | prettier ✓ on touched files (1 pre-existing unrelated `docs_genesis/_THE_RULES.md` warning, flagged earlier in session, not my scope) | vitest 597/597 ✓ (+44 from L1) | next build ✓ | playwright chromium 41/41 ✓ (+3 from L1).
+- **Active batch:** L2 — PDF ingestion via the L1 pipeline
+- **Active sub-batch:** L2.1 — DONE locally (unpdf@^1.6.2 added + research report written), awaiting founder commit + push
+- **Last commit relevant to Phase L:** `35f50fc` (L1.12 batch closure)
+- **Next concrete action:** Founder commits L2.1 (`pnpm add unpdf` → package.json/pnpm-lock.yaml + `docs_operations/_PDF_LIB_RESEARCH.md`). After push, this doc advances to L2.2 — implement `src/lib/ingestion/pdf-extract.ts` using `unpdf.extractText(buffer)` → `{totalPages, text: string[]}`. File header references the research doc + records the chosen-engine rationale per the report's "what I'd ship today" block.
+- **Blockers:** §6.1 (real-bank PDF samples) — load-bearing for L2.8 (pdf-extract tests against real fixtures), L2.9 (collect samples), L2.10 (e2e). L2.2–L2.7 are unblocked (can ship against synthetic / minimal fixtures).
+- **Files in flight (uncommitted edits):** `package.json` + `pnpm-lock.yaml` (unpdf dep) + `docs_operations/_PDF_LIB_RESEARCH.md` (research report) + this tracker.
 
 ---
 
@@ -99,7 +98,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L1.10** — surface AI-source banner + per-column `reason` in PreviewStep. _(Re-scoped: original was "imports.mapping.\* i18n block" but L1.8 + L1.9 already added the critical UI keys. L1.10 now extends `previewing` state with `perFieldConfidence`, propagates from `runExtractor`, renders a banner when `source === 'ai'/'mixed'`, and shows the AI's per-column reason text under each select.)_ · `c342695` · 2026-05-22
 - [x] **L1.11** — `tests/e2e/api-imports-parse.spec.ts`: e2e auth-401 contract for the parse endpoint (3 tests pinning auth-before-validation order). _(Originally scoped as a UI-flow e2e; rescoped to auth-spec to match the existing pattern — no signed-in Playwright fixture exists in this repo.)_ · `0fffe74` · 2026-05-22
 - ~~**L1.11.5**~~ (dropped — founder decided 2026-05-22 to defer RTL for PreviewStep's AI banner / reason rendering. PreviewStep's added surface is small + exercised by manual launch testing. Future regression risk acknowledged. Reversal: add this sub-batch if a regression actually happens.)
-- [x] **L1.12** — Gate sweep + tracker update (mark L1 done in §3 + §5 + §1) + commit message proposal. **L1 batch closed.** _(awaiting push)_
+- [x] **L1.12** — Gate sweep + tracker update (mark L1 done in §3 + §5 + §1) + commit message proposal. **L1 batch closed.** · `35f50fc` · 2026-06-01
 
 **L1 dependencies:** B2 (Anthropic SDK wrapper) ✓, B5 (transactionRepo import path) ✓, existing csv-import-wizard ✓ — all from Phase 6/7.
 
@@ -107,7 +106,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 
 > See [\_PHASE_L_PLAN.md §2 L2](./_PHASE_L_PLAN.md#batch-l2--pdf-ingestion-via-the-l1-pipeline).
 
-- [ ] **L2.1** — Choose PDF lib (pdf-parse vs pdfjs-dist) + add dep; document choice in a comment
+- [ ] **L2.1** — Choose PDF lib (pdf-parse vs pdfjs-dist) + add dep; document choice in a comment. _Decision (2026-06-01): **unpdf** picked over pdfjs-dist-direct + pdf-parse after `deep-research` workflow report (101 agents, 25 verified claims). Full rationale in [\_PDF_LIB_RESEARCH.md](./_PDF_LIB_RESEARCH.md). Added unpdf@^1.6.2; awaiting push._
 - [ ] **L2.2** — `src/lib/ingestion/pdf-extract.ts`: pure server-side PDF buffer → text rows transformation
 - [ ] **L2.3** — `src/lib/ingestion/ai-detect.ts` (extend): add "prose-mode" system prompt for free-text → structured rows (cached separately from CSV mode)
 - [ ] **L2.4** — `src/lib/ingestion/extractor.ts` (extend): add `extractFromPdf(buffer)` entry that chains pdf-extract → ai-detect prose-mode
@@ -238,7 +237,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
-- 2026-05-22 — **L1 BATCH CLOSED via L1.12** — 13 sub-batches shipped (L1.1 → L1.11 + L1.2.5 + L1.6.5 + L1.7.5; L1.11.5 dropped). Full gate sweep: vitest 597/597, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L1: 5 ingestion modules + 5 ingestion tests + 1 API route + 1 API-route test + 1 e2e spec + 1 wizard refactor + 5 i18n keys. Ready to advance to L2 (PDF ingestion via the L1 pipeline).
+- 2026-06-01 — **L1 BATCH CLOSED via L1.12** — `35f50fc` — 13 sub-batches shipped (L1.1 → L1.11 + L1.2.5 + L1.6.5 + L1.7.5; L1.11.5 dropped). Full gate sweep: vitest 597/597, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L1: 5 ingestion modules + 5 ingestion tests + 1 API route + 1 API-route test + 1 e2e spec + 1 wizard refactor + 5 i18n keys. Ready to advance to L2 (PDF ingestion via the L1 pipeline).
 - 2026-05-22 — L1.11 closed — `0fffe74` — e2e auth spec for `/api/v1/imports/parse` (`tests/e2e/api-imports-parse.spec.ts`); 3 anonymous-401 tests pinning auth-runs-before-Zod and auth-runs-before-body-parse order
 - 2026-05-22 — L1.10 closed — `c342695` — AI-source banner + per-column reason in PreviewStep (`src/components/imports/csv-import-wizard.tsx`); previewing state gains `perFieldConfidence`; banner when `source === 'ai'/'mixed'`; per-column reason rendered under select when present; +1 i18n key
 - 2026-05-22 — L1.9 closed — `e4d9c30` — wizard wired to parse endpoint (`src/components/imports/csv-import-wizard.tsx`); dropped in-wizard `detectColumns`; new `detecting` state w/ spinner; `runExtractor` POSTs to `/api/v1/imports/parse`; previewing state carries `source`; defensive fallbacks for missing bank/mapping; +2 i18n keys; locked no-silent-fallback behavior on server error
