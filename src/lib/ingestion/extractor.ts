@@ -1,34 +1,42 @@
 import 'server-only';
-import { aiDetect } from './ai-detect';
+import { aiDetect, aiDetectProse } from './ai-detect';
 import { heuristicDetect } from './heuristic-detect';
-import type { ExtractorResult } from './types';
+import { extractPdfText } from './pdf-extract';
+import type { ExtractorResult, ExtractorStepTrace } from './types';
 
 /**
- * Ingestion-pipeline orchestrator (Phase L1.4).
+ * Ingestion-pipeline orchestrator.
  *
- * Single entry point for CSV column extraction. Pipeline:
+ * Two entry points:
  *
- *   1. Run `heuristicDetect` (synchronous, free).
- *   2. If `result.overallConfidence >= HEURISTIC_CONFIDENCE_THRESHOLD`,
- *      return that result — the AI call is skipped entirely (no
- *      tokens spent, no network latency).
- *   3. Otherwise call `aiDetect` (Claude Haiku, ~$0.005–$0.02/import).
- *      The returned result has its trace prepended with the
- *      heuristic step so ops visibility shows what was tried first.
- *      Source is `'ai'` when the AI returns a usable result,
- *      `'mixed'` is reserved for future iterations that combine
- *      both signals.
+ *   - `extractFromCsv` (Phase L1.4):
+ *       1. Run `heuristicDetect` (synchronous, free).
+ *       2. If overallConfidence ≥ HEURISTIC_CONFIDENCE_THRESHOLD,
+ *          return — AI call skipped entirely.
+ *       3. Otherwise call `aiDetect` (Claude Haiku); merge traces
+ *          (heuristic step prepended to AI step).
+ *
+ *   - `extractFromPdf` (Phase L2.4):
+ *       1. Run `extractPdfText` (server-side unpdf).
+ *       2. Call `aiDetectProse` with the per-page text.
+ *       3. Merge traces (pdf step prepended to AI step).
+ *       There is NO heuristic step for PDFs — no PDF analog of CSV
+ *       header signature matching exists (the source has no
+ *       headers, only free text). Always escalates straight to AI.
  *
  * The orchestrator is the ONLY function callers in the wizard /
- * API route (L1.7/L1.8/L1.9) should invoke. Direct use of
- * `heuristicDetect` or `aiDetect` is reserved for tests.
+ * API routes (L1.7/L1.8/L1.9, L2.5/L2.6) should invoke. Direct use
+ * of `heuristicDetect`, `aiDetect`, `aiDetectProse`, or
+ * `extractPdfText` is reserved for tests.
  *
- * Pure of caching, idempotent w.r.t. its inputs (modulo AI
- * non-determinism on the fallback path). Throws ONLY if `aiDetect`
- * throws — and per ai-detect's locked guarantees, it doesn't throw,
- * it returns a `failed` ExtractorResult. So in practice this
- * orchestrator never throws either; callers can rely on always
- * getting a result back.
+ * Throws semantics:
+ *   - `extractFromCsv` never throws (ai-detect's never-throw
+ *     contract holds).
+ *   - `extractFromPdf` MAY throw if `extractPdfText` throws
+ *     (corrupt PDF / password-protected / non-PDF input). The
+ *     L2.6 route layer catches + maps to user-facing copy. This
+ *     is the OPPOSITE of CSV: PDF parsing failures are
+ *     user-action errors, not silent fallbacks.
  */
 
 /**
@@ -77,6 +85,51 @@ export async function extractFromCsv(input: ExtractFromCsvInput): Promise<Extrac
     ...aiResult,
     trace: {
       steps: [...heuristicResult.trace.steps, ...aiResult.trace.steps],
+    },
+  };
+}
+
+// -----------------------------------------------------------------------------
+// PDF entry (Phase L2.4).
+// -----------------------------------------------------------------------------
+
+/**
+ * PDF orchestrator. Chains `extractPdfText` → `aiDetectProse` and
+ * merges traces.
+ *
+ * Throws ONLY when `extractPdfText` throws (corrupt PDF / encrypted
+ * / non-PDF). The L2.6 route catches + maps to user-facing copy.
+ * `aiDetectProse` itself never throws — it returns a `failed`
+ * `ExtractorResult` on every internal failure mode.
+ */
+export async function extractFromPdf(buffer: Uint8Array): Promise<ExtractorResult> {
+  /*
+   * pdf-extract.ts owns the timing of its own step (sets
+   * `durationMs` on its result). We build a trace step from that
+   * so the AI step's timing reads as an independent measurement
+   * rather than wall-clock-summed-against-PDF.
+   */
+  const pdfExtract = await extractPdfText(buffer);
+
+  const pdfTrace: ExtractorStepTrace = {
+    step: 'pdf',
+    durationMs: pdfExtract.durationMs,
+    /*
+     * `matched` when we got any non-empty page; `fallback` when
+     * every page is empty (image-only / scanned PDF). The AI step
+     * that follows will short-circuit on empty input either way,
+     * but this lets ops distinguish "PDF had no text layer" from
+     * "AI couldn't extract from real text".
+     */
+    outcome: pdfExtract.pages.some((p) => p.trim().length > 0) ? 'matched' : 'fallback',
+  };
+
+  const aiResult = await aiDetectProse({ pages: pdfExtract.pages });
+
+  return {
+    ...aiResult,
+    trace: {
+      steps: [pdfTrace, ...aiResult.trace.steps],
     },
   };
 }

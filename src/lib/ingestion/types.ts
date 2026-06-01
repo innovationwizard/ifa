@@ -73,7 +73,13 @@ export interface ExtractedRow {
  * existing AI cost telemetry from B2.
  */
 export interface ExtractorStepTrace {
-  step: 'heuristic' | 'ai';
+  /**
+   * Pipeline step. `'heuristic'` and `'ai'` for the CSV pipeline
+   * (L1); `'pdf'` for the L2 PDF text-extraction step that runs
+   * before the AI prose-mode call. Distinguished in the trace so
+   * ops can grep PDF latency vs AI latency separately.
+   */
+  step: 'heuristic' | 'ai' | 'pdf';
   durationMs: number;
   outcome: 'matched' | 'fallback' | 'failed';
   /**
