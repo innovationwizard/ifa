@@ -237,3 +237,101 @@ scheduler at that point. The two candidates would be:
 
 This ADR does not preclude either path. It just removes Vercel
 Cron from the MVP critical path.
+
+---
+
+## ADR-003 — Bank-grade security posture: tightest available, never "good enough for MVP"
+
+**Date:** 2026-06-01
+**Status:** Adopted. Applies to every security-shaped decision in
+the codebase, retroactive and forward.
+
+### Context
+
+Surfaced at the start of L3.4 (email-change re-auth). When the
+implementation choice between "Supabase default flow" and
+"magic-link re-auth on current email before any change" came up,
+the founder's response was unambiguous:
+
+> "This app handles people's and businesses' BANKING INFO!
+> It needs to be AT LEAST AS SECURE AS A BANK!!! TIGHTEST
+> SECURITY IS A MUST!!!!!!!!!!"
+
+(Verbatim, 2026-06-01.)
+
+This isn't a one-off scoping decision for one sub-batch. IFA
+stores users' personal + business banking history; the threat
+model is "would a Guatemalan bank's CISO sign off on this?"
+A breach would be reputation-ending; the cost of "extra friction"
+is rounding-error compared to the cost of a security incident.
+
+### Decision
+
+On every security-shaped decision in IFA's codebase, the default
+is the **tightest available primitive**, not the smallest-MVP
+scope. This applies to:
+
+- Auth flows (sign-in, sign-out, session refresh)
+- Re-auth gates on sensitive mutations (email change, password
+  change, account deletion, payment-method change, data export)
+- Session lifetimes + idle-timeout
+- Use of platform-native primitives (Supabase MFA / nonce /
+  re-auth, Stripe Radar, etc.) instead of rolled-our-own
+- Rate limiting on auth + sensitive routes
+- Audit logging for state-changing security operations
+- Route gating (server-side, not client-side)
+- CSRF / XSS / clickjacking hardening
+- Secret handling (env-var only, never logged, never echoed)
+
+### How this applies to L3.4 specifically
+
+Email change uses a **two-step nonce flow** anchored on Supabase's
+`auth.reauthenticate()` primitive:
+
+1. User opens email-change form, types the new email.
+2. Server action sends a 6-digit nonce to the user's **current**
+   email via `supabase.auth.reauthenticate()`. (Mitigation:
+   proves the request originator has access to the CURRENT inbox,
+   not just the active session.)
+3. User enters the code in the form within ~15 min.
+4. Server action calls `supabase.auth.updateUser({email, nonce})`.
+   Supabase verifies the nonce and triggers its own confirmation-
+   link flow to the NEW email.
+5. New email becomes active after the user clicks the new-email
+   confirmation link. The old email also receives a notification
+   from Supabase (defense in depth).
+
+Three independent factors must succeed: session cookie + current-
+email access + new-email access. Stealing one isn't enough.
+
+### How this applies going forward
+
+Any future sub-batch with a security-shaped choice (L3.5 password
+flow, L3.6 data export, L3.7 account deletion, L4.x email-link
+security, L5.x Stripe webhook idempotency / signature checks, all
+of L6/L7) MUST:
+
+- Pick the tightest primitive available.
+- Document the chosen primitive + the threat model it mitigates
+  in a file-level docblock.
+- Reference this ADR.
+- If a "good enough for MVP" path is available AND the user
+  explicitly chooses it via AskUserQuestion, document the
+  deviation as a per-sub-batch carve-out (NOT a general loosening
+  of this ADR).
+
+### Reversal trigger
+
+If the user ever explicitly says "loosen security here for X
+reason," that's a per-decision carve-out documented in the
+relevant sub-batch — NOT a reversal of this ADR. To reverse this
+ADR globally would require explicit founder direction and an
+ADR-NNN supersession entry. Default until then: tightest.
+
+### Related
+
+- Memory: `feedback_security_posture.md` — captures the verbatim
+  rule + how to apply for future Claude sessions.
+- `_THE_RULES.MD` — the constitution this ADR enforces in the
+  security domain (production-first, enterprise-grade, no
+  corners cut).

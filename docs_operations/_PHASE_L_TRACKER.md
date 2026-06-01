@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L3 — Settings (account hygiene)
-- **Active sub-batch:** L3.3 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** `ed2d5a8` (Prisma config interjection); prod schema synced.
-- **Next concrete action:** Founder commits L3.3. After push, this doc advances to L3.4 — account-card email change. **Open question §6.2 becomes load-bearing at L3.4** (re-auth required before email change? Default per the tracker is "yes — session-hijack mitigation"). I'll surface it when starting L3.4.
-- **Blockers:** §6.2 (email-change re-auth) — surface at L3.4 entry.
-- **Files in flight (uncommitted edits):** `src/app/(app)/configuracion/actions.ts` (new — `updateProfile` server action) + `src/components/settings/profile-card.tsx` (new — client form) + `src/app/(app)/configuracion/page.tsx` (renders ProfileCard in the Perfil section) + `src/messages/es-GT.json` (new `settings.profile.form.*` keys).
+- **Active sub-batch:** _(at §6.2 wall — email-change re-auth decision; awaiting founder direction)_
+- **Last commit relevant to Phase L:** `dc5b542` (L3.3 profile-card + updateProfile).
+- **Next concrete action:** Founder picks the L3.4 re-auth posture. Question surfaced in chat. IFA is passwordless (magic-link + Google OAuth), so the only meaningful "re-auth" is a magic link to the CURRENT email — Supabase's default `updateUser({email})` already (a) sends a confirmation link to the new email and (b) notifies the old email of the change, which covers the simplest threat model without an extra round trip.
+- **Blockers:** §6.2 (email-change re-auth) — open question.
+- **Files in flight (uncommitted edits):** none.
 
 ---
 
@@ -128,7 +128,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 
 - [x] **L3.1** — Schema: add `Profile.deletedAt` + `ProfileMember.deletedAt` if not already there; `pnpm db:push` _(code shipped; `db:push` against prod is a founder action that follows the push)_ · `2212dfb` · 2026-06-01
 - [x] **L3.2** — `src/app/(app)/configuracion/page.tsx`: shell with 4 sections · `8bb12a4` · 2026-06-01
-- [ ] **L3.3** — `src/components/settings/profile-card.tsx` + `updateProfile` action
+- [x] **L3.3** — `src/components/settings/profile-card.tsx` + `updateProfile` action · `dc5b542` · 2026-06-01
 - [ ] **L3.4** — `src/components/settings/account-card.tsx`: email change flow (re-auth required)
 - [ ] **L3.5** — `src/components/settings/account-card.tsx`: password reset trigger (Supabase default for L3; L4 may brand)
 - [ ] **L3.6** — `src/components/settings/data-card.tsx` + `exportData` action (ZIP: transactions.csv + health_scores.csv + profile.json)
@@ -240,6 +240,7 @@ Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-lin
 Newest at top. Never delete; append only.
 
 - 2026-06-01 — **L2 BATCH CLOSED PARTIALLY via L2.11** — `ef79340` — 8 sub-batches shipped (L2.1 → L2.8 + L2.6.5). 3 sub-batches carried forward as documented debt: L2.8.5 (real-fixture pdf-extract tests), L2.9 (founder samples), L2.10 (PDF e2e). All blocked on §6.1 founder outreach. Full partial gate sweep: vitest 619/619, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L2: pdf-extract module + ai-detect prose-mode + extractor PDF entry + parse-pdf route + 4 test files + 3 i18n keys + wizard PDF branch + 1 dep (unpdf) + 1 deep-research-driven decision doc. PDF preview-UI adaptation noted as known-limitation post-L2.
+- 2026-06-01 — L3.3 closed — `dc5b542` — Perfil section (`src/app/(app)/configuracion/actions.ts` new + `src/components/settings/profile-card.tsx` new + page.tsx wiring + i18n); `updateProfile` server action (Zod-validated displayName/dpiNumber/dateOfBirth); 4-state client form (idle / submitting / saved / error); revalidates `/configuracion` + `/dashboard` (dashboard greets by displayName). 619/619 tests still pass.
 - 2026-06-01 — Interjection (Prisma config) — `ed2d5a8` — migrated `package.json#prisma#seed` → `prisma.config.ts` to address Prisma 7 deprecation warning. Minimum-change: only seed command moves; schema path + datasource URL keep defaults. Verified by `pnpm db:generate` → "Loaded Prisma config from prisma.config.ts" (warning gone). Behavior note: Prisma now skips auto-loading .env when a config file is present; we already wrap with `dotenv -e .env.local --` in every `pnpm db:*` script so this is unaffected.
 - 2026-06-01 — L3.2 closed — `8bb12a4` — `/configuracion` shell (`src/app/(app)/configuracion/page.tsx`); replaced ModulePlaceholder with 4-section Card shell (Perfil → Cuenta → Tus datos → Eliminar, delete last so user scrolls past everything else first); new `settings.*` i18n block; new `tests/e2e/configuracion.spec.ts` auth-proxy spec (1 test).
 - 2026-06-01 — L3.1 closed — `2212dfb` — schema additions for soft-delete (`prisma/schema.prisma`); `Profile.deletedAt` + `ProfileMember.deletedAt` (both `DateTime?`, additive, zero data loss); prod synced via founder-run `pnpm db:push` 2026-06-01.
