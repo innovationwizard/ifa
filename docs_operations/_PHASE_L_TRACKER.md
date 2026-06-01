@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L2 — PDF ingestion via the L1 pipeline
-- **Active sub-batch:** L2.2 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** `5f58479` (L2.1 unpdf added + research)
-- **Next concrete action:** Founder commits L2.2 (`src/lib/ingestion/pdf-extract.ts`). After push, this doc advances to L2.3 — extend `src/lib/ingestion/ai-detect.ts` with "prose mode" for free-text → structured rows. The CSV mode's system prompt expects `{headers, sampleRows}`; prose mode will take a list of pages (strings) and ask Claude to extract structured transaction rows directly. Cached separately from CSV mode (different system prompt → different cache key).
-- **Blockers:** §6.1 (real-bank samples) — load-bearing for L2.8/L2.9/L2.10.
-- **Files in flight (uncommitted edits):** `src/lib/ingestion/pdf-extract.ts` (new, ready to commit)
+- **Active sub-batch:** L2.3 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `35bbbca` (L2.2 pdf-extract)
+- **Next concrete action:** Founder commits L2.3 (`src/lib/ingestion/ai-detect.ts` — CSV rename + prose-mode addition). After push, this doc advances to L2.4 — extend `extractor.ts` with `extractFromPdf(buffer)` entry that chains `pdf-extract` → `aiDetectProse`. NO heuristic for PDFs (there's no PDF analog of CSV header matching); the orchestrator always escalates straight to AI for PDF input.
+- **Blockers:** §6.1 (real-bank samples) — load-bearing for L2.8/L2.9/L2.10. L2.4 unblocked.
+- **Files in flight (uncommitted edits):** `src/lib/ingestion/ai-detect.ts` (modified — CSV-rename + prose mode addition; existing 10 CSV tests still pass)
 
 ---
 
@@ -107,7 +107,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > See [\_PHASE_L_PLAN.md §2 L2](./_PHASE_L_PLAN.md#batch-l2--pdf-ingestion-via-the-l1-pipeline).
 
 - [x] **L2.1** — Choose PDF lib (pdf-parse vs pdfjs-dist) + add dep; document choice in a comment. _Decision (2026-06-01): **unpdf** picked over pdfjs-dist-direct + pdf-parse after `deep-research` workflow report (101 agents, 25 verified claims). Full rationale in [\_PDF_LIB_RESEARCH.md](./_PDF_LIB_RESEARCH.md). Added unpdf@^1.6.2._ · `5f58479` · 2026-06-01
-- [ ] **L2.2** — `src/lib/ingestion/pdf-extract.ts`: pure server-side PDF buffer → text rows transformation
+- [x] **L2.2** — `src/lib/ingestion/pdf-extract.ts`: pure server-side PDF buffer → text rows transformation · `35bbbca` · 2026-06-01
 - [ ] **L2.3** — `src/lib/ingestion/ai-detect.ts` (extend): add "prose-mode" system prompt for free-text → structured rows (cached separately from CSV mode)
 - [ ] **L2.4** — `src/lib/ingestion/extractor.ts` (extend): add `extractFromPdf(buffer)` entry that chains pdf-extract → ai-detect prose-mode
 - [ ] **L2.5** — `src/components/imports/csv-import-wizard.tsx` (extend): widen `<input accept>` to include `.pdf`, branch parse step on MIME type
@@ -237,6 +237,7 @@ to satisfy one acceptance item.
 Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-line summary>`.
 Newest at top. Never delete; append only.
 
+- 2026-06-01 — L2.2 closed — `35bbbca` — pdf-extract.ts (`src/lib/ingestion/pdf-extract.ts`); pure async `extractPdfText(buffer) → {pages: string[], totalPages, durationMs}` wrapping `unpdf.extractText`. Locked: errors propagate (opposite of ai-detect's never-throw contract — PDF parsing failures are user-action errors). Tests deferred to L2.8.
 - 2026-06-01 — L2.1 closed — `5f58479` — chose `unpdf@^1.6.2` over pdfjs-dist-direct + pdf-parse via the `deep-research` workflow (101 agents, 25 adversarially-verified claims, 20 confirmed / 5 killed). Full report at `docs_operations/_PDF_LIB_RESEARCH.md`. Open question (load-bearing for L2.8–L2.10): zero GT-specific empirical evidence — must test against real BAC/Industrial/Banrural samples via §6.1 founder outreach.
 - 2026-06-01 — **L1 BATCH CLOSED via L1.12** — `35f50fc` — 13 sub-batches shipped (L1.1 → L1.11 + L1.2.5 + L1.6.5 + L1.7.5; L1.11.5 dropped). Full gate sweep: vitest 597/597, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L1: 5 ingestion modules + 5 ingestion tests + 1 API route + 1 API-route test + 1 e2e spec + 1 wizard refactor + 5 i18n keys. Ready to advance to L2 (PDF ingestion via the L1 pipeline).
 - 2026-05-22 — L1.11 closed — `0fffe74` — e2e auth spec for `/api/v1/imports/parse` (`tests/e2e/api-imports-parse.spec.ts`); 3 anonymous-401 tests pinning auth-runs-before-Zod and auth-runs-before-body-parse order
