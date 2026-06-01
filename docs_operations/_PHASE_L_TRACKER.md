@@ -55,11 +55,13 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L3 — Settings (account hygiene)
-- **Active sub-batch:** L3.2 — DONE locally, awaiting founder commit + push
-- **Last commit relevant to Phase L:** `2212dfb` (L3.1 schema additions)
-- **Next concrete action:** Founder commits L3.2 (`/configuracion` shell + i18n + e2e). After push, this doc advances to L3.3 (`profile-card` — displayName / dpiNumber / dob form + `updateProfile` server action). L3.3 is the first sub-batch that touches Profile fields beyond what L3.2's auth check already does; no DB schema dependency on L3.1's new columns yet (those land in L3.7's softDelete).
-- **Blockers:** db:push against prod still pending — flagged separately in chat. L3.2 doesn't touch the new deletedAt columns; L3.3 doesn't either. The L3.1 schema becomes load-bearing at L3.7 + L3.8.
-- **Files in flight (uncommitted edits):** `src/app/(app)/configuracion/page.tsx` (replaced ModulePlaceholder with the 4-section shell) + `src/messages/es-GT.json` (new `settings.*` block) + `tests/e2e/configuracion.spec.ts` (new auth-proxy spec).
+- **Active sub-batch:** L3.2 DONE locally + an interjection commit pending (Prisma config migration — out-of-L-plan tooling fix)
+- **Last commit relevant to Phase L:** `2212dfb` (L3.1 schema additions); prod schema synced via `pnpm db:push` (founder ran it 2026-06-01).
+- **Next concrete action:** Founder commits TWO separate commits (or one combined if preferred): (1) L3.2 = `/configuracion` shell + i18n + e2e; (2) **interjection** = Prisma config migration (`prisma.config.ts` new + `package.json#prisma` block removed) — addresses the Prisma 7 deprecation warning. After both pushed, advance to L3.3.
+- **Blockers:** none (db:push synced).
+- **Files in flight (uncommitted edits):**
+  - L3.2: `src/app/(app)/configuracion/page.tsx` + `src/messages/es-GT.json` + `tests/e2e/configuracion.spec.ts`.
+  - Interjection: `prisma.config.ts` (new) + `package.json` (removed `prisma` block).
 
 ---
 

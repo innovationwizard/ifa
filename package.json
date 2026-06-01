@@ -27,9 +27,6 @@
     "db:seed": "dotenv -e .env.local -- tsx prisma/seed.ts",
     "prepare": "husky"
   },
-  "prisma": {
-    "seed": "dotenv -e .env.local -- tsx prisma/seed.ts"
-  },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
       "eslint --fix",
