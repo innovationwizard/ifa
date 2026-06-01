@@ -669,7 +669,19 @@
     "sections": {
       "profile": {
         "title": "Perfil",
-        "description": "Tu nombre y datos básicos."
+        "description": "Tu nombre y datos básicos.",
+        "form": {
+          "displayNameLabel": "Nombre",
+          "dpiNumberLabel": "DPI",
+          "dpiNumberHelp": "13 dígitos. Lo guardamos solo como referencia; no lo compartimos con nadie.",
+          "dateOfBirthLabel": "Fecha de nacimiento",
+          "optional": "(opcional)",
+          "save": "Guardar",
+          "saving": "Guardando...",
+          "saved": "Guardado",
+          "errorValidation": "Revisa los campos.",
+          "errorUnknown": "Algo falló. Intenta de nuevo en un minuto."
+        }
       },
       "account": {
         "title": "Cuenta",

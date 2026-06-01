@@ -55,13 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L3 — Settings (account hygiene)
-- **Active sub-batch:** L3.2 DONE locally + an interjection commit pending (Prisma config migration — out-of-L-plan tooling fix)
-- **Last commit relevant to Phase L:** `2212dfb` (L3.1 schema additions); prod schema synced via `pnpm db:push` (founder ran it 2026-06-01).
-- **Next concrete action:** Founder commits TWO separate commits (or one combined if preferred): (1) L3.2 = `/configuracion` shell + i18n + e2e; (2) **interjection** = Prisma config migration (`prisma.config.ts` new + `package.json#prisma` block removed) — addresses the Prisma 7 deprecation warning. After both pushed, advance to L3.3.
-- **Blockers:** none (db:push synced).
-- **Files in flight (uncommitted edits):**
-  - L3.2: `src/app/(app)/configuracion/page.tsx` + `src/messages/es-GT.json` + `tests/e2e/configuracion.spec.ts`.
-  - Interjection: `prisma.config.ts` (new) + `package.json` (removed `prisma` block).
+- **Active sub-batch:** L3.3 — DONE locally, awaiting founder commit + push
+- **Last commit relevant to Phase L:** `ed2d5a8` (Prisma config interjection); prod schema synced.
+- **Next concrete action:** Founder commits L3.3. After push, this doc advances to L3.4 — account-card email change. **Open question §6.2 becomes load-bearing at L3.4** (re-auth required before email change? Default per the tracker is "yes — session-hijack mitigation"). I'll surface it when starting L3.4.
+- **Blockers:** §6.2 (email-change re-auth) — surface at L3.4 entry.
+- **Files in flight (uncommitted edits):** `src/app/(app)/configuracion/actions.ts` (new — `updateProfile` server action) + `src/components/settings/profile-card.tsx` (new — client form) + `src/app/(app)/configuracion/page.tsx` (renders ProfileCard in the Perfil section) + `src/messages/es-GT.json` (new `settings.profile.form.*` keys).
 
 ---
 
@@ -129,7 +127,7 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > See [\_PHASE_L_PLAN.md §2 L3](./_PHASE_L_PLAN.md#batch-l3--settings-page-account-hygiene).
 
 - [x] **L3.1** — Schema: add `Profile.deletedAt` + `ProfileMember.deletedAt` if not already there; `pnpm db:push` _(code shipped; `db:push` against prod is a founder action that follows the push)_ · `2212dfb` · 2026-06-01
-- [ ] **L3.2** — `src/app/(app)/configuracion/page.tsx`: shell with 4 sections
+- [x] **L3.2** — `src/app/(app)/configuracion/page.tsx`: shell with 4 sections · `8bb12a4` · 2026-06-01
 - [ ] **L3.3** — `src/components/settings/profile-card.tsx` + `updateProfile` action
 - [ ] **L3.4** — `src/components/settings/account-card.tsx`: email change flow (re-auth required)
 - [ ] **L3.5** — `src/components/settings/account-card.tsx`: password reset trigger (Supabase default for L3; L4 may brand)
@@ -242,6 +240,9 @@ Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-lin
 Newest at top. Never delete; append only.
 
 - 2026-06-01 — **L2 BATCH CLOSED PARTIALLY via L2.11** — `ef79340` — 8 sub-batches shipped (L2.1 → L2.8 + L2.6.5). 3 sub-batches carried forward as documented debt: L2.8.5 (real-fixture pdf-extract tests), L2.9 (founder samples), L2.10 (PDF e2e). All blocked on §6.1 founder outreach. Full partial gate sweep: vitest 619/619, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L2: pdf-extract module + ai-detect prose-mode + extractor PDF entry + parse-pdf route + 4 test files + 3 i18n keys + wizard PDF branch + 1 dep (unpdf) + 1 deep-research-driven decision doc. PDF preview-UI adaptation noted as known-limitation post-L2.
+- 2026-06-01 — Interjection (Prisma config) — `ed2d5a8` — migrated `package.json#prisma#seed` → `prisma.config.ts` to address Prisma 7 deprecation warning. Minimum-change: only seed command moves; schema path + datasource URL keep defaults. Verified by `pnpm db:generate` → "Loaded Prisma config from prisma.config.ts" (warning gone). Behavior note: Prisma now skips auto-loading .env when a config file is present; we already wrap with `dotenv -e .env.local --` in every `pnpm db:*` script so this is unaffected.
+- 2026-06-01 — L3.2 closed — `8bb12a4` — `/configuracion` shell (`src/app/(app)/configuracion/page.tsx`); replaced ModulePlaceholder with 4-section Card shell (Perfil → Cuenta → Tus datos → Eliminar, delete last so user scrolls past everything else first); new `settings.*` i18n block; new `tests/e2e/configuracion.spec.ts` auth-proxy spec (1 test).
+- 2026-06-01 — L3.1 closed — `2212dfb` — schema additions for soft-delete (`prisma/schema.prisma`); `Profile.deletedAt` + `ProfileMember.deletedAt` (both `DateTime?`, additive, zero data loss); prod synced via founder-run `pnpm db:push` 2026-06-01.
 - 2026-06-01 — L2.8 closed — `6c7adb7` — structural PDF tests (`src/lib/ingestion/pdf-extract.test.ts` new + `extractor.test.ts` extended); 11 new tests pinning pdf-extract's pure-transformation contract (happy, empty, errors-propagate w/ ORIGINAL Error instance) + extractFromPdf branch (trace merge, empty-pages 'fallback' vs 'matched', orchestrator re-throws). 37/37 ingestion tests pass. Real-fixture coverage deferred to L2.8.5.
 - 2026-06-01 — L2.7 closed — `69e62d4` — print-to-PDF tip in IdleStep (`src/messages/es-GT.json` + `src/components/imports/csv-import-wizard.tsx`); single `imports.pdfHelp.printTip` key in tú-register Spanish + `<p>` below the dropzone covering the "printable web pages" case. Scope smaller than original `imports.pdfHelp.*` block plan because L2.5 already covered `upload.prompt/hint`; remaining PDF i18n deferred post-L2.
 - 2026-06-01 — L2.6.5 closed — `1591262` — parse-pdf route tests (`src/app/api/v1/imports/parse-pdf/route.test.ts`); 11 mocked-extractor tests pinning auth gating (401/400; extractor NOT called), content-type guard (rejects JSON, accepts suffix + case-insensitive), body guards (empty 400, oversize 413), extractor-throws → 400 `pdf_extract_failed` with message echo (incl. non-Error throw via String(err) for defense), happy path (200 ExtractorResult shape preserved + body forwarded as Uint8Array).

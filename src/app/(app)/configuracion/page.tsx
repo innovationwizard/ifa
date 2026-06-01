@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProfileCard } from '@/components/settings/profile-card';
 import { getCurrentUser } from '@/lib/auth/server';
 import { profileRepo } from '@/lib/db/repositories';
 
@@ -32,9 +33,19 @@ export default async function ConfiguracionPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/ingresar');
   const profiles = await profileRepo.findManyForUser(user.id);
-  if (profiles.length === 0) redirect('/bienvenida');
+  const profile = profiles[0];
+  if (!profile) redirect('/bienvenida');
 
   const t = await getTranslations('settings');
+
+  /*
+   * Format the Profile.dateOfBirth (DateTime? @db.Date) as the
+   * YYYY-MM-DD string the <input type="date"> expects. UTC slice
+   * is safe because the column has no time component.
+   */
+  const dateOfBirthIso = profile.dateOfBirth
+    ? profile.dateOfBirth.toISOString().slice(0, 10)
+    : null;
 
   /*
    * Section list in render order. The order matches the user's
@@ -80,14 +91,23 @@ export default async function ConfiguracionPage() {
               <CardDescription>{section.description}</CardDescription>
             </CardHeader>
             <CardContent>
-              {/*
-               * L3.2 ships placeholder shell only. L3.3–L3.7
-               * replace each placeholder body with its real
-               * component (forms, server-action buttons, etc.).
-               */}
-              <p className="text-ifa-gray-500 text-xs tracking-wide uppercase">
-                {t('placeholderSoon')}
-              </p>
+              {section.key === 'profile' ? (
+                <ProfileCard
+                  initial={{
+                    displayName: profile.displayName,
+                    dpiNumber: profile.dpiNumber,
+                    dateOfBirth: dateOfBirthIso,
+                  }}
+                />
+              ) : (
+                /*
+                 * L3.3 replaced the Perfil placeholder. L3.4–L3.7
+                 * replace the remaining sections in turn.
+                 */
+                <p className="text-ifa-gray-500 text-xs tracking-wide uppercase">
+                  {t('placeholderSoon')}
+                </p>
+              )}
             </CardContent>
           </Card>
         ))}
