@@ -81,8 +81,8 @@ export function AccountCard({
   unlinkError = null,
   unlinkedJustNow = false,
 }: AccountCardProps) {
-  const t = useTranslations('settings.account.email');
-  const tMethods = useTranslations('settings.account.signInMethods');
+  const t = useTranslations('settings.sections.account.email');
+  const tMethods = useTranslations('settings.sections.account.signInMethods');
   const [newEmail, setNewEmail] = useState('');
   const [status, setStatus] = useState<EmailStatus>({ kind: 'idle' });
   const [isSending, startSending] = useTransition();

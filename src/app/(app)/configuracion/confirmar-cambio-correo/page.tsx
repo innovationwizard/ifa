@@ -54,7 +54,7 @@ export default async function ConfirmarCambioCorreoPage({
   const user = userData.user;
   if (!user) redirect('/ingresar');
 
-  const t = await getTranslations('settings.account.email.confirmPage');
+  const t = await getTranslations('settings.sections.account.email.confirmPage');
 
   /*
    * Read the `confirmed=true` query param so we can render the

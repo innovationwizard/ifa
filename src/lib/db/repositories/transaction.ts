@@ -490,6 +490,18 @@ export const transactionRepo = {
   },
 
   /**
+   * All transactions for the current tenant, no pagination or date
+   * filter. Used by Phase L3.6 data export — friends-and-family
+   * scale fits comfortably in memory. Caller MUST be inside
+   * `withTenant(...)`.
+   */
+  listAllForExport(): Promise<Transaction[]> {
+    return prisma.transaction.findMany({
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
+    });
+  },
+
+  /**
    * Cursor-paginated list with optional filters.
    *
    * Ordering: `date DESC, id DESC`. UUIDv7 ids are time-ordered so the

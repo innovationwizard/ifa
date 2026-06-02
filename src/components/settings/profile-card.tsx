@@ -43,7 +43,7 @@ export interface ProfileCardProps {
 type FormStatus = { kind: 'idle' } | { kind: 'saved' } | { kind: 'error'; messageKey: string };
 
 export function ProfileCard({ initial }: ProfileCardProps) {
-  const t = useTranslations('settings.profile.form');
+  const t = useTranslations('settings.sections.profile.form');
   const [displayName, setDisplayName] = useState(initial.displayName);
   const [dpiNumber, setDpiNumber] = useState(initial.dpiNumber ?? '');
   const [dateOfBirth, setDateOfBirth] = useState(initial.dateOfBirth ?? '');

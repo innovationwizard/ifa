@@ -106,6 +106,16 @@ export const profileRepo = {
       return profile;
     });
   },
+
+  /**
+   * All ProfileMember rows for the current tenant. Used by Phase L3.6
+   * data export. Caller MUST be inside `withTenant(...)`.
+   */
+  listMembersForExport() {
+    return prisma.profileMember.findMany({
+      orderBy: { invitedAt: 'asc' },
+    });
+  },
 };
 
 export type ProfileRepo = typeof profileRepo;

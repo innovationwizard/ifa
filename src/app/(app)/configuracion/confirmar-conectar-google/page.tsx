@@ -46,7 +46,7 @@ export default async function ConfirmarConectarGooglePage() {
   const user = userData.user;
   if (!user) redirect('/ingresar');
 
-  const t = await getTranslations('settings.account.signInMethods.google.confirmPage');
+  const t = await getTranslations('settings.sections.account.signInMethods.google.confirmPage');
 
   const gate = computeGate(user);
 

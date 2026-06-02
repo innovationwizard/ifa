@@ -48,7 +48,7 @@ export default async function ConfirmarDesconectarGooglePage() {
   const user = userData.user;
   if (!user) redirect('/ingresar');
 
-  const t = await getTranslations('settings.account.signInMethods.google.disconnectPage');
+  const t = await getTranslations('settings.sections.account.signInMethods.google.disconnectPage');
 
   const gate = computeGate(user);
 

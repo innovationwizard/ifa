@@ -89,6 +89,16 @@ export const healthScoreRepo = {
     });
   },
 
+  /**
+   * Full HealthScore history for the current tenant — no limit. Used
+   * by Phase L3.6 data export. Caller MUST be inside `withTenant(...)`.
+   */
+  listAllForExport(): Promise<HealthScore[]> {
+    return prisma.healthScore.findMany({
+      orderBy: { computedAt: 'desc' },
+    });
+  },
+
   findHistoryForProfile(args: { limit?: number } = {}): Promise<HealthScore[]> {
     const limit = args.limit ?? 30;
     return prisma.healthScore.findMany({

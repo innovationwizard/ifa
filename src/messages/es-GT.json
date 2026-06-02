@@ -838,7 +838,17 @@
       },
       "data": {
         "title": "Tus datos",
-        "description": "Descarga todo lo que tenemos guardado de ti."
+        "description": "Descarga todo lo que tenemos guardado de ti.",
+        "body": "Descarga un archivo ZIP con todo lo que IFA tiene guardado de ti: tu perfil, tus transacciones, tu historial de Salud Financiera y los estados de cuenta que subiste.",
+        "cta": "Descargar mis datos (ZIP)",
+        "preparing": "Preparando tu archivo…",
+        "error": {
+          "http_401": "Tu sesión terminó. Vuelve a entrar para descargar tus datos.",
+          "http_400": "No pudimos preparar el archivo. Verifica que tu perfil esté completo.",
+          "http_404": "No encontramos tu cuenta. Vuelve a entrar y prueba de nuevo.",
+          "http_500": "Algo falló de nuestro lado. Intenta de nuevo en un momento.",
+          "network": "No se pudo conectar. Revisa tu internet y prueba de nuevo."
+        }
       },
       "delete": {
         "title": "Eliminar mi cuenta",

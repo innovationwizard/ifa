@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountCard } from '@/components/settings/account-card';
+import { DataCard } from '@/components/settings/data-card';
 import { ProfileCard } from '@/components/settings/profile-card';
 import { getCurrentUser } from '@/lib/auth/server';
 import { profileRepo } from '@/lib/db/repositories';
@@ -148,10 +149,11 @@ export default async function ConfiguracionPage({
                   unlinkError={unlinkErrorParam}
                   unlinkedJustNow={unlinkedJustNow}
                 />
+              ) : section.key === 'data' ? (
+                <DataCard />
               ) : (
                 /*
-                 * L3.3 + L3.4 replaced Perfil and Cuenta. L3.5–L3.7
-                 * replace the remaining sections in turn.
+                 * Delete card (L3.7) — still placeholder.
                  */
                 <p className="text-ifa-gray-500 text-xs tracking-wide uppercase">
                   {t('placeholderSoon')}
