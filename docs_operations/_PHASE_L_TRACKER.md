@@ -55,11 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L3 — Settings (account hygiene)
-- **Active sub-batch:** L3.5 — DONE locally (read-only sign-in methods display)
-- **Last commit relevant to Phase L:** `d180d2c` (L3.4 bank-grade email change)
-- **Next concrete action:** Founder commits L3.5. After push, this doc advances to L3.5.5 (connect Google with magic-link re-auth gate). L3.5.5 will reuse the L3.4 confirmation-page pattern: separate route at `/configuracion/confirmar-conectar-google` or similar, gated by `last_sign_in_at` freshness + pending-action metadata. After successful re-auth, server calls `supabase.auth.linkIdentity({provider: 'google'})` which initiates the OAuth round trip.
-- **Blockers:** none.
-- **Files in flight (uncommitted edits):** `src/components/settings/account-card.tsx` (added `googleLinked` prop + `MethodRow` subcomponent + sign-in methods section replacing the password placeholder) + `src/app/(app)/configuracion/page.tsx` (derives googleLinked from `user.identities`) + `src/messages/es-GT.json` (removed dead `passwordSectionTitle`/`passwordPlaceholder` keys; added `settings.account.signInMethods.*` block).
+- **Active sub-batch:** L3.5.5 — DONE locally (connect Google with bank-grade re-auth gate)
+- **Last commit relevant to Phase L:** `e6d6a81` (L3.5 read-only sign-in methods)
+- **Next concrete action:** Founder commits L3.5.5. After push, this doc advances to L3.5.6 (disconnect Google with re-auth gate). L3.5.6 reuses the same magic-link → confirm-page pattern; on confirm it calls `supabase.auth.unlinkIdentity(googleIdentity)`. Defense-in-depth: the UI must never offer disconnect when Google is the user's only identity (Supabase refuses to unlink the last identity, but we should gate at the AccountCard layer too).
+- **Blockers:** none. `Allow manual linking` is ON in Supabase (founder confirmed 2026-06-02 via screenshot).
+- **Files in flight (uncommitted edits):** `src/app/(app)/configuracion/actions.ts` (added `requestGoogleLink` + `confirmGoogleLink` — mirrors L3.4 three-factor gate, uses `pendingLinkGoogleRequestedAt` metadata key, `linkIdentity({skipBrowserRedirect: true})` + server `redirect()` to Google) + `src/app/(app)/configuracion/confirmar-conectar-google/page.tsx` (NEW — gate-checking server page mirroring L3.4 confirmar-cambio-correo) + `src/components/settings/account-card.tsx` (Connect-Google button + link-sent state + linkError/linkedJustNow props) + `src/app/(app)/configuracion/page.tsx` (threads `?linked=google` / `?linkError=` query params to AccountCard) + `src/messages/es-GT.json` (added `signInMethods.google.connect.*` + `signInMethods.google.confirmPage.*` blocks; dropped now-unused `signInMethods.soonAction`) + `src/app/(app)/configuracion/actions.test.ts` (NEW — 7 unit tests covering every confirmGoogleLink gate state + happy-path redirect).
 
 ---
 

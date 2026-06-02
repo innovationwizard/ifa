@@ -348,6 +348,174 @@ export async function confirmEmailChange(): Promise<ConfirmEmailChangeResult> {
   return { ok: true };
 }
 
+// ----------------------------------------------------------------------------
+// Link Google identity — Phase L3.5.5 (ADR-003 bank-grade two-step flow).
+// ----------------------------------------------------------------------------
+
+/*
+ * The connect-Google flow reuses the L3.4 freshness/TTL windows
+ * verbatim (FRESH_SIGN_IN_WINDOW_SECONDS, PENDING_CHANGE_TTL_SECONDS).
+ * Same security profile: just-clicked magic link + same-session
+ * pending action started ≤ 15 min ago.
+ *
+ * Metadata key: `pendingLinkGoogleRequestedAt` (ISO string). Presence
+ * alone signals the action — no value field needed because the action
+ * is unambiguous. Independent slot from `pendingEmailChange*` so the
+ * two flows can coexist without collision.
+ */
+
+export interface RequestGoogleLinkResult {
+  ok: boolean;
+  errorKey?: 'session_email_missing' | 'already_linked' | 'send_failed' | 'unknown';
+}
+
+export async function requestGoogleLink(): Promise<RequestGoogleLinkResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) redirect('/ingresar');
+  const currentEmail = user.email;
+  if (!currentEmail) {
+    return { ok: false, errorKey: 'session_email_missing' };
+  }
+
+  /*
+   * Refuse if Google is already linked. Defense-in-depth — the UI
+   * only renders the Connect button when !googleLinked, but a stale
+   * page or replayed request could still hit this action.
+   */
+  const alreadyLinked = (user.identities ?? []).some((i) => i.provider === 'google');
+  if (alreadyLinked) {
+    return { ok: false, errorKey: 'already_linked' };
+  }
+
+  const requestedAt = new Date().toISOString();
+  const { error: stashErr } = await supabase.auth.updateUser({
+    data: { pendingLinkGoogleRequestedAt: requestedAt },
+  });
+  if (stashErr) {
+    console.warn('[requestGoogleLink] metadata stash failed', stashErr);
+    return { ok: false, errorKey: 'unknown' };
+  }
+
+  const origin = await resolveOrigin();
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent('/configuracion/confirmar-conectar-google')}`;
+  const { error: otpErr } = await supabase.auth.signInWithOtp({
+    email: currentEmail,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: redirectTo,
+    },
+  });
+  if (otpErr) {
+    console.warn('[requestGoogleLink] signInWithOtp failed', otpErr);
+    return { ok: false, errorKey: 'send_failed' };
+  }
+
+  return { ok: true };
+}
+
+export interface ConfirmGoogleLinkResult {
+  ok: boolean;
+  errorKey?:
+    | 'not_authenticated'
+    | 'fresh_sign_in_required'
+    | 'no_pending_change'
+    | 'pending_change_expired'
+    | 'already_linked'
+    | 'link_failed'
+    | 'unknown';
+}
+
+/**
+ * Step 2 of the bank-grade connect-Google flow (ADR-003).
+ *
+ * Three gates (all required) before the OAuth URL is generated:
+ *   1. Authenticated (action redirects to /ingresar if not).
+ *   2. `last_sign_in_at` fresh (≤ FRESH_SIGN_IN_WINDOW_SECONDS).
+ *   3. `user_metadata.pendingLinkGoogleRequestedAt` set + not stale.
+ *
+ * On success: clears the pending metadata, calls
+ * `supabase.auth.linkIdentity({provider: 'google', skipBrowserRedirect: true})`
+ * to generate the OAuth URL, and server-redirects the browser there.
+ * Google → /auth/callback → identity linked → /configuracion?linked=google.
+ *
+ * If linkIdentity errors before redirect, we return the error key and
+ * the metadata is NOT cleared (action is retryable).
+ *
+ * Throws via `redirect(url)` on the happy path — call sites need to
+ * treat NEXT_REDIRECT specially (Next.js convention).
+ */
+export async function confirmGoogleLink(): Promise<ConfirmGoogleLinkResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    return { ok: false, errorKey: 'not_authenticated' };
+  }
+
+  const lastSignInIso = user.last_sign_in_at;
+  const lastSignInAge = lastSignInIso
+    ? (Date.now() - new Date(lastSignInIso).getTime()) / 1000
+    : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(lastSignInAge) || lastSignInAge > FRESH_SIGN_IN_WINDOW_SECONDS) {
+    return { ok: false, errorKey: 'fresh_sign_in_required' };
+  }
+
+  const metadata = user.user_metadata;
+  const pendingAtIso =
+    typeof metadata.pendingLinkGoogleRequestedAt === 'string'
+      ? metadata.pendingLinkGoogleRequestedAt
+      : null;
+  if (!pendingAtIso) {
+    return { ok: false, errorKey: 'no_pending_change' };
+  }
+  const pendingAgeSeconds = (Date.now() - new Date(pendingAtIso).getTime()) / 1000;
+  if (!Number.isFinite(pendingAgeSeconds) || pendingAgeSeconds > PENDING_CHANGE_TTL_SECONDS) {
+    await supabase.auth.updateUser({ data: { pendingLinkGoogleRequestedAt: null } }).catch(() => {
+      /* swallow — already failing, just being tidy */
+    });
+    return { ok: false, errorKey: 'pending_change_expired' };
+  }
+
+  /*
+   * Defense-in-depth: re-check linked state in case a parallel tab
+   * already completed a link since the request was issued.
+   */
+  if ((user.identities ?? []).some((i) => i.provider === 'google')) {
+    await supabase.auth.updateUser({ data: { pendingLinkGoogleRequestedAt: null } }).catch(() => {
+      /* swallow — already failing, just being tidy */
+    });
+    return { ok: false, errorKey: 'already_linked' };
+  }
+
+  const origin = await resolveOrigin();
+  const oauthRedirect = `${origin}/auth/callback?next=${encodeURIComponent('/configuracion?linked=google')}`;
+  const { data: oauthData, error: linkErr } = await supabase.auth.linkIdentity({
+    provider: 'google',
+    options: {
+      redirectTo: oauthRedirect,
+      scopes: 'email profile openid',
+      skipBrowserRedirect: true,
+    },
+  });
+  if (linkErr || !oauthData.url) {
+    console.warn('[confirmGoogleLink] linkIdentity failed', linkErr);
+    return { ok: false, errorKey: 'link_failed' };
+  }
+
+  /*
+   * Clear pending metadata BEFORE redirecting so a parallel
+   * tab can't re-confirm. Best-effort: if the clear fails we still
+   * redirect — the freshness window expires in 60s anyway.
+   */
+  await supabase.auth.updateUser({ data: { pendingLinkGoogleRequestedAt: null } }).catch(() => {
+    /* best-effort cleanup; OAuth URL is already valid */
+  });
+
+  redirect(oauthData.url);
+}
+
 async function resolveOrigin(): Promise<string> {
   /*
    * Prefer the live request's origin so dev (localhost), preview

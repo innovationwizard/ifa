@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { CheckCircle2, Loader2, Mail, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { requestEmailChange } from '@/app/(app)/configuracion/actions';
+import { requestEmailChange, requestGoogleLink } from '@/app/(app)/configuracion/actions';
 
 /**
  * `<AccountCard>` — Phase L3.4 email-change form (and L3.5 password
@@ -30,19 +30,41 @@ export interface AccountCardProps {
   /**
    * L3.5 read-only display: whether the user has Google OAuth linked.
    * Page derives this from `user.identities.some(i => i.provider === 'google')`.
-   * Connect/disconnect actions land in L3.5.5/L3.5.6.
+   * L3.5.5 adds the connect-Google flow when this is false; L3.5.6 will
+   * add disconnect when this is true.
    */
   googleLinked: boolean;
+  /**
+   * L3.5.5: optional error code surfaced from `/configuracion` after the
+   * confirmGoogleLink action failed and redirected back with
+   * `?linkError=<key>`. Renders an inline alert near the Google row.
+   */
+  linkError?: string | null;
+  /**
+   * L3.5.5: when `/configuracion?linked=google` came back from the
+   * OAuth callback, surface a success banner near the Google row.
+   * The MethodRow status already shows "Conectado" — this is the
+   * "just happened" affordance.
+   */
+  linkedJustNow?: boolean;
 }
 
 type EmailStatus = { kind: 'idle' } | { kind: 'link-sent' } | { kind: 'error'; errorKey: string };
+type LinkStatus = { kind: 'idle' } | { kind: 'link-sent' } | { kind: 'error'; errorKey: string };
 
-export function AccountCard({ currentEmail, googleLinked }: AccountCardProps) {
+export function AccountCard({
+  currentEmail,
+  googleLinked,
+  linkError = null,
+  linkedJustNow = false,
+}: AccountCardProps) {
   const t = useTranslations('settings.account.email');
   const tMethods = useTranslations('settings.account.signInMethods');
   const [newEmail, setNewEmail] = useState('');
   const [status, setStatus] = useState<EmailStatus>({ kind: 'idle' });
   const [isSending, startSending] = useTransition();
+  const [linkStatus, setLinkStatus] = useState<LinkStatus>({ kind: 'idle' });
+  const [isLinking, startLinking] = useTransition();
 
   function handleEdit(v: string): void {
     setNewEmail(v);
@@ -58,6 +80,21 @@ export function AccountCard({ currentEmail, googleLinked }: AccountCardProps) {
         setStatus({ kind: 'link-sent' });
       } else {
         setStatus({
+          kind: 'error',
+          errorKey: result.errorKey ?? 'unknown',
+        });
+      }
+    });
+  }
+
+  function handleLinkGoogle(e: React.FormEvent<HTMLFormElement>): void {
+    e.preventDefault();
+    startLinking(async () => {
+      const result = await requestGoogleLink();
+      if (result.ok) {
+        setLinkStatus({ kind: 'link-sent' });
+      } else {
+        setLinkStatus({
           kind: 'error',
           errorKey: result.errorKey ?? 'unknown',
         });
@@ -161,7 +198,77 @@ export function AccountCard({ currentEmail, googleLinked }: AccountCardProps) {
           />
         </ul>
 
-        <p className="text-ifa-gray-500 text-xs">{tMethods('soonAction')}</p>
+        {!googleLinked && linkStatus.kind === 'link-sent' ? (
+          /*
+           * L3.5.5 step-1 success: magic link is on its way to the
+           * user's CURRENT email. They click it → land on
+           * /configuracion/confirmar-conectar-google → confirm →
+           * server-redirected to Google → /auth/callback →
+           * /configuracion?linked=google.
+           */
+          <div className="border-ifa-teal-200 bg-ifa-teal-50 flex items-start gap-3 rounded-lg border p-4">
+            <Mail className="text-ifa-teal-700 mt-0.5 size-5 shrink-0" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <p className="text-ifa-navy-900 text-sm font-medium">
+                {tMethods('google.connect.linkSentTitle')}
+              </p>
+              <p className="text-ifa-gray-700 text-xs leading-relaxed">
+                {tMethods('google.connect.linkSentBody', { email: currentEmail })}
+              </p>
+            </div>
+          </div>
+        ) : !googleLinked ? (
+          <form className="flex flex-col gap-2" onSubmit={handleLinkGoogle}>
+            <p className="text-ifa-gray-500 text-xs">{tMethods('google.connect.intro')}</p>
+            {linkStatus.kind === 'error' && (
+              <p className="text-xs text-red-700">
+                {tMethods(`google.connect.error.${linkStatus.errorKey}`)}
+              </p>
+            )}
+            {linkError && (
+              <p className="text-xs text-red-700">
+                {tMethods(`google.connect.error.${linkError}`)}
+              </p>
+            )}
+            <div className="flex sm:justify-end">
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                disabled={isLinking}
+                className="w-full sm:w-auto"
+              >
+                {isLinking ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    <span>{tMethods('google.connect.sending')}</span>
+                  </>
+                ) : (
+                  tMethods('google.connect.cta')
+                )}
+              </Button>
+            </div>
+          </form>
+        ) : linkedJustNow ? (
+          /*
+           * L3.5.5 happy-path landing: just returned from Google with
+           * the identity attached. The MethodRow already shows
+           * "Conectado"; this adds the "just happened" affordance.
+           */
+          <div className="border-ifa-teal-200 bg-ifa-teal-50 flex items-start gap-3 rounded-lg border p-4">
+            <CheckCircle2 className="text-ifa-teal-700 mt-0.5 size-5 shrink-0" aria-hidden />
+            <p className="text-ifa-navy-900 text-sm font-medium">
+              {tMethods('google.linkedJustNow')}
+            </p>
+          </div>
+        ) : (
+          /*
+           * Google already linked, not just-linked. Disconnect lands
+           * in L3.5.6 — until then surface the "soon" note so the
+           * user knows where the control will live.
+           */
+          <p className="text-ifa-gray-500 text-xs">{tMethods('google.disconnectSoon')}</p>
+        )}
       </section>
     </div>
   );

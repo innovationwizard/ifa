@@ -30,7 +30,11 @@ export async function generateMetadata() {
   return { title: t('title') };
 }
 
-export default async function ConfiguracionPage() {
+export default async function ConfiguracionPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect('/ingresar');
   const profiles = await profileRepo.findManyForUser(user.id);
@@ -38,6 +42,18 @@ export default async function ConfiguracionPage() {
   if (!profile) redirect('/bienvenida');
 
   const t = await getTranslations('settings');
+
+  /*
+   * L3.5.5 deep-link params: `?linked=google` after a successful
+   * connect-Google round trip; `?linkError=<key>` when the
+   * confirmGoogleLink action bounced back from the confirmation page.
+   * Both are passed to AccountCard for inline feedback near the
+   * Google row. Single-string narrowing — arrays come back as
+   * undefined to keep the AccountCard prop shape simple.
+   */
+  const params = await searchParams;
+  const linkErrorParam = typeof params.linkError === 'string' ? params.linkError : null;
+  const linkedJustNow = params.linked === 'google';
 
   /*
    * Format the Profile.dateOfBirth (DateTime? @db.Date) as the
@@ -116,6 +132,8 @@ export default async function ConfiguracionPage() {
                 <AccountCard
                   currentEmail={user.email ?? ''}
                   googleLinked={(user.identities ?? []).some((i) => i.provider === 'google')}
+                  linkError={linkErrorParam}
+                  linkedJustNow={linkedJustNow}
                 />
               ) : (
                 /*
