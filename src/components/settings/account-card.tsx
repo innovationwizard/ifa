@@ -4,7 +4,11 @@ import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { CheckCircle2, Loader2, Mail, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { requestEmailChange, requestGoogleLink } from '@/app/(app)/configuracion/actions';
+import {
+  requestEmailChange,
+  requestGoogleLink,
+  requestGoogleUnlink,
+} from '@/app/(app)/configuracion/actions';
 
 /**
  * `<AccountCard>` — Phase L3.4 email-change form (and L3.5 password
@@ -47,16 +51,35 @@ export interface AccountCardProps {
    * "just happened" affordance.
    */
   linkedJustNow?: boolean;
+  /**
+   * L3.5.6: total identity count (e.g. `user.identities.length`). When
+   * Google is the user's ONLY identity, disconnect must be hidden — the
+   * Supabase API refuses to unlink the last identity anyway, but the
+   * UI should not even surface the action.
+   */
+  identityCount: number;
+  /**
+   * L3.5.6: optional error code surfaced from `/configuracion?unlinkError=`.
+   */
+  unlinkError?: string | null;
+  /**
+   * L3.5.6: surface "Desconectado" banner after `/configuracion?unlinked=google`.
+   */
+  unlinkedJustNow?: boolean;
 }
 
 type EmailStatus = { kind: 'idle' } | { kind: 'link-sent' } | { kind: 'error'; errorKey: string };
 type LinkStatus = { kind: 'idle' } | { kind: 'link-sent' } | { kind: 'error'; errorKey: string };
+type UnlinkStatus = { kind: 'idle' } | { kind: 'link-sent' } | { kind: 'error'; errorKey: string };
 
 export function AccountCard({
   currentEmail,
   googleLinked,
   linkError = null,
   linkedJustNow = false,
+  identityCount,
+  unlinkError = null,
+  unlinkedJustNow = false,
 }: AccountCardProps) {
   const t = useTranslations('settings.account.email');
   const tMethods = useTranslations('settings.account.signInMethods');
@@ -65,6 +88,8 @@ export function AccountCard({
   const [isSending, startSending] = useTransition();
   const [linkStatus, setLinkStatus] = useState<LinkStatus>({ kind: 'idle' });
   const [isLinking, startLinking] = useTransition();
+  const [unlinkStatus, setUnlinkStatus] = useState<UnlinkStatus>({ kind: 'idle' });
+  const [isUnlinking, startUnlinking] = useTransition();
 
   function handleEdit(v: string): void {
     setNewEmail(v);
@@ -101,6 +126,29 @@ export function AccountCard({
       }
     });
   }
+
+  function handleUnlinkGoogle(e: React.FormEvent<HTMLFormElement>): void {
+    e.preventDefault();
+    startUnlinking(async () => {
+      const result = await requestGoogleUnlink();
+      if (result.ok) {
+        setUnlinkStatus({ kind: 'link-sent' });
+      } else {
+        setUnlinkStatus({
+          kind: 'error',
+          errorKey: result.errorKey ?? 'unknown',
+        });
+      }
+    });
+  }
+
+  /*
+   * L3.5.6 gate: disconnect is offered ONLY when Google is linked AND
+   * the user has at least one other identity. Without another identity
+   * they would be locked out — Supabase refuses to unlink the last,
+   * but our UI must not even offer the option.
+   */
+  const canDisconnectGoogle = googleLinked && identityCount >= 2;
 
   return (
     <div className="flex flex-col gap-6">
@@ -249,25 +297,88 @@ export function AccountCard({
               </Button>
             </div>
           </form>
-        ) : linkedJustNow ? (
+        ) : (
           /*
-           * L3.5.5 happy-path landing: just returned from Google with
-           * the identity attached. The MethodRow already shows
-           * "Conectado"; this adds the "just happened" affordance.
+           * googleLinked === true. Three sub-paths:
+           *
+           *   - linkedJustNow:    success banner after OAuth round trip.
+           *   - unlinkedJustNow:  shouldn't fire here (googleLinked is
+           *                       now false), kept defensively.
+           *   - last identity:    show explainer instead of button.
+           *   - normal state:     "Desconectar Google" form.
+           */
+          <>
+            {linkedJustNow && (
+              <div className="border-ifa-teal-200 bg-ifa-teal-50 flex items-start gap-3 rounded-lg border p-4">
+                <CheckCircle2 className="text-ifa-teal-700 mt-0.5 size-5 shrink-0" aria-hidden />
+                <p className="text-ifa-navy-900 text-sm font-medium">
+                  {tMethods('google.linkedJustNow')}
+                </p>
+              </div>
+            )}
+            {unlinkStatus.kind === 'link-sent' ? (
+              <div className="border-ifa-teal-200 bg-ifa-teal-50 flex items-start gap-3 rounded-lg border p-4">
+                <Mail className="text-ifa-teal-700 mt-0.5 size-5 shrink-0" aria-hidden />
+                <div className="flex flex-col gap-1">
+                  <p className="text-ifa-navy-900 text-sm font-medium">
+                    {tMethods('google.disconnect.linkSentTitle')}
+                  </p>
+                  <p className="text-ifa-gray-700 text-xs leading-relaxed">
+                    {tMethods('google.disconnect.linkSentBody', { email: currentEmail })}
+                  </p>
+                </div>
+              </div>
+            ) : !canDisconnectGoogle ? (
+              <p className="text-ifa-gray-500 text-xs">
+                {tMethods('google.disconnect.lastIdentityHint')}
+              </p>
+            ) : (
+              <form className="flex flex-col gap-2" onSubmit={handleUnlinkGoogle}>
+                <p className="text-ifa-gray-500 text-xs">{tMethods('google.disconnect.intro')}</p>
+                {unlinkStatus.kind === 'error' && (
+                  <p className="text-xs text-red-700">
+                    {tMethods(`google.disconnect.error.${unlinkStatus.errorKey}`)}
+                  </p>
+                )}
+                {unlinkError && (
+                  <p className="text-xs text-red-700">
+                    {tMethods(`google.disconnect.error.${unlinkError}`)}
+                  </p>
+                )}
+                <div className="flex sm:justify-end">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="outline"
+                    disabled={isUnlinking}
+                    className="w-full sm:w-auto"
+                  >
+                    {isUnlinking ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                        <span>{tMethods('google.disconnect.sending')}</span>
+                      </>
+                    ) : (
+                      tMethods('google.disconnect.cta')
+                    )}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </>
+        )}
+        {unlinkedJustNow && !googleLinked && (
+          /*
+           * After /configuracion?unlinked=google: googleLinked is now
+           * false (the MethodRow shows "No conectado"). Surface the
+           * "just disconnected" affordance above the Connect button.
            */
           <div className="border-ifa-teal-200 bg-ifa-teal-50 flex items-start gap-3 rounded-lg border p-4">
             <CheckCircle2 className="text-ifa-teal-700 mt-0.5 size-5 shrink-0" aria-hidden />
             <p className="text-ifa-navy-900 text-sm font-medium">
-              {tMethods('google.linkedJustNow')}
+              {tMethods('google.unlinkedJustNow')}
             </p>
           </div>
-        ) : (
-          /*
-           * Google already linked, not just-linked. Disconnect lands
-           * in L3.5.6 — until then surface the "soon" note so the
-           * user knows where the control will live.
-           */
-          <p className="text-ifa-gray-500 text-xs">{tMethods('google.disconnectSoon')}</p>
         )}
       </section>
     </div>

@@ -54,6 +54,16 @@ export default async function ConfiguracionPage({
   const params = await searchParams;
   const linkErrorParam = typeof params.linkError === 'string' ? params.linkError : null;
   const linkedJustNow = params.linked === 'google';
+  /*
+   * L3.5.6 deep-link params: `?unlinked=google` after a successful
+   * disconnect; `?unlinkError=<key>` when confirmGoogleUnlink bounced.
+   */
+  const unlinkErrorParam = typeof params.unlinkError === 'string' ? params.unlinkError : null;
+  const unlinkedJustNow = params.unlinked === 'google';
+
+  const identities = user.identities ?? [];
+  const googleLinked = identities.some((i) => i.provider === 'google');
+  const identityCount = identities.length;
 
   /*
    * Format the Profile.dateOfBirth (DateTime? @db.Date) as the
@@ -131,9 +141,12 @@ export default async function ConfiguracionPage({
                  */
                 <AccountCard
                   currentEmail={user.email ?? ''}
-                  googleLinked={(user.identities ?? []).some((i) => i.provider === 'google')}
+                  googleLinked={googleLinked}
                   linkError={linkErrorParam}
                   linkedJustNow={linkedJustNow}
+                  identityCount={identityCount}
+                  unlinkError={unlinkErrorParam}
+                  unlinkedJustNow={unlinkedJustNow}
                 />
               ) : (
                 /*

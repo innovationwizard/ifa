@@ -42,6 +42,7 @@ vi.mock('@/lib/env', () => ({
 const getUserMock = vi.fn();
 const updateUserMock = vi.fn();
 const linkIdentityMock = vi.fn();
+const unlinkIdentityMock = vi.fn();
 
 vi.mock('@/lib/auth/server', () => ({
   createSupabaseServerSideClient: vi.fn(() =>
@@ -50,30 +51,45 @@ vi.mock('@/lib/auth/server', () => ({
         getUser: getUserMock,
         updateUser: updateUserMock,
         linkIdentity: linkIdentityMock,
+        unlinkIdentity: unlinkIdentityMock,
       },
     }),
   ),
   getCurrentUser: vi.fn(),
 }));
 
-import { confirmGoogleLink } from './actions';
+import { confirmGoogleLink, confirmGoogleUnlink } from './actions';
 
 interface FakeUserOverrides {
   identities?: { provider: string }[] | null;
   lastSignInAt?: string | null;
   pendingAt?: string | null;
+  metadataKey?: 'pendingLinkGoogleRequestedAt' | 'pendingUnlinkGoogleRequestedAt';
 }
 
 function fakeUser(overrides: FakeUserOverrides = {}) {
+  const metadataKey = overrides.metadataKey ?? 'pendingLinkGoogleRequestedAt';
   return {
     id: 'user_uuid_xyz',
     email: 'test@example.com',
     last_sign_in_at: overrides.lastSignInAt ?? new Date().toISOString(),
     identities: overrides.identities ?? [{ provider: 'email' }],
     user_metadata: {
-      pendingLinkGoogleRequestedAt: overrides.pendingAt ?? new Date().toISOString(),
+      [metadataKey]: overrides.pendingAt ?? new Date().toISOString(),
     },
   };
+}
+
+function unlinkFakeUser(overrides: Omit<FakeUserOverrides, 'metadataKey'> = {}) {
+  /*
+   * Default identities for an unlink test: email + google (length 2),
+   * so the last-identity gate doesn't trip unless overridden.
+   */
+  return fakeUser({
+    ...overrides,
+    metadataKey: 'pendingUnlinkGoogleRequestedAt',
+    identities: overrides.identities ?? [{ provider: 'email' }, { provider: 'google' }],
+  });
 }
 
 beforeEach(() => {
@@ -204,6 +220,127 @@ describe('confirmGoogleLink — security gates (ADR-003)', () => {
     expect(linkCallArg?.options.skipBrowserRedirect).toBe(true);
     expect(updateUserMock).toHaveBeenCalledWith({
       data: { pendingLinkGoogleRequestedAt: null },
+    });
+  });
+});
+
+describe('confirmGoogleUnlink — security gates (ADR-003)', () => {
+  it('refuses when user is not authenticated', async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: false, errorKey: 'not_authenticated' });
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses when last_sign_in_at is older than 60s', async () => {
+    getUserMock.mockResolvedValue({
+      data: {
+        user: unlinkFakeUser({
+          lastSignInAt: new Date('2026-06-01T23:58:59Z').toISOString(),
+        }),
+      },
+    });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: false, errorKey: 'fresh_sign_in_required' });
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses when no pending-unlink metadata is set', async () => {
+    getUserMock.mockResolvedValue({
+      data: {
+        user: {
+          ...unlinkFakeUser(),
+          user_metadata: {},
+        },
+      },
+    });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: false, errorKey: 'no_pending_change' });
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses + clears metadata when pending-unlink is older than 15 min', async () => {
+    getUserMock.mockResolvedValue({
+      data: {
+        user: unlinkFakeUser({
+          pendingAt: new Date('2026-06-01T23:44:00Z').toISOString(),
+        }),
+      },
+    });
+    updateUserMock.mockResolvedValue({ error: null });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: false, errorKey: 'pending_change_expired' });
+    expect(updateUserMock).toHaveBeenCalledWith({
+      data: { pendingUnlinkGoogleRequestedAt: null },
+    });
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses when Google is not linked', async () => {
+    getUserMock.mockResolvedValue({
+      data: {
+        user: unlinkFakeUser({
+          identities: [{ provider: 'email' }],
+        }),
+      },
+    });
+    updateUserMock.mockResolvedValue({ error: null });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: false, errorKey: 'not_linked' });
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses when Google is the only identity (would strand user)', async () => {
+    getUserMock.mockResolvedValue({
+      data: {
+        user: unlinkFakeUser({
+          identities: [{ provider: 'google' }],
+        }),
+      },
+    });
+    updateUserMock.mockResolvedValue({ error: null });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: false, errorKey: 'last_identity' });
+    expect(unlinkIdentityMock).not.toHaveBeenCalled();
+  });
+
+  it('returns unlink_failed when unlinkIdentity errors', async () => {
+    getUserMock.mockResolvedValue({ data: { user: unlinkFakeUser() } });
+    unlinkIdentityMock.mockResolvedValue({
+      data: null,
+      error: { message: 'Manual linking is disabled', name: 'AuthApiError', status: 400 },
+    });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: false, errorKey: 'unlink_failed' });
+  });
+
+  it('unlinks Google + clears metadata + returns ok on happy path', async () => {
+    getUserMock.mockResolvedValue({ data: { user: unlinkFakeUser() } });
+    unlinkIdentityMock.mockResolvedValue({ data: {}, error: null });
+    updateUserMock.mockResolvedValue({ error: null });
+
+    const result = await confirmGoogleUnlink();
+
+    expect(result).toEqual({ ok: true });
+    expect(unlinkIdentityMock).toHaveBeenCalledTimes(1);
+    const arg = unlinkIdentityMock.mock.calls[0]?.[0] as { provider: string } | undefined;
+    expect(arg?.provider).toBe('google');
+    expect(updateUserMock).toHaveBeenCalledWith({
+      data: { pendingUnlinkGoogleRequestedAt: null },
     });
   });
 });

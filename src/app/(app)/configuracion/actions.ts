@@ -516,6 +516,173 @@ export async function confirmGoogleLink(): Promise<ConfirmGoogleLinkResult> {
   redirect(oauthData.url);
 }
 
+// ----------------------------------------------------------------------------
+// Unlink Google identity — Phase L3.5.6 (ADR-003 bank-grade two-step flow).
+// ----------------------------------------------------------------------------
+
+/*
+ * Same three-factor gate as L3.4/L3.5.5 (freshness ≤ 60s + pending action
+ * ≤ 15 min). Independent metadata slot: `pendingUnlinkGoogleRequestedAt`.
+ *
+ * Extra safety vs. L3.5.5 (which only verifies !alreadyLinked):
+ *   - Google identity must still be present (idempotency).
+ *   - User must retain ≥ 1 OTHER identity after unlink. Supabase refuses
+ *     to unlink the last identity, but we re-check at our layer so the
+ *     UI never even offers the option, and the action returns a typed
+ *     error key instead of a Supabase string.
+ *
+ * Refactor candidate (deferred): L3.4 + L3.5.5 + L3.5.6 all share the
+ * (auth + freshness + pending-metadata) gate shape. Three is the
+ * threshold where extraction makes sense, but doing it now would touch
+ * already-shipped/tested L3.4 + L3.5.5 code. Punt until L3 closure.
+ */
+
+export interface RequestGoogleUnlinkResult {
+  ok: boolean;
+  errorKey?: 'session_email_missing' | 'not_linked' | 'last_identity' | 'send_failed' | 'unknown';
+}
+
+export async function requestGoogleUnlink(): Promise<RequestGoogleUnlinkResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) redirect('/ingresar');
+  const currentEmail = user.email;
+  if (!currentEmail) {
+    return { ok: false, errorKey: 'session_email_missing' };
+  }
+
+  const identities = user.identities ?? [];
+  const hasGoogle = identities.some((i) => i.provider === 'google');
+  if (!hasGoogle) {
+    return { ok: false, errorKey: 'not_linked' };
+  }
+  /*
+   * Refuse if Google is the user's only identity. Without another
+   * identity the user can no longer sign in after unlink — Supabase
+   * blocks this anyway, but we surface a typed error before sending
+   * the magic link rather than after the round-trip.
+   */
+  if (identities.length < 2) {
+    return { ok: false, errorKey: 'last_identity' };
+  }
+
+  const requestedAt = new Date().toISOString();
+  const { error: stashErr } = await supabase.auth.updateUser({
+    data: { pendingUnlinkGoogleRequestedAt: requestedAt },
+  });
+  if (stashErr) {
+    console.warn('[requestGoogleUnlink] metadata stash failed', stashErr);
+    return { ok: false, errorKey: 'unknown' };
+  }
+
+  const origin = await resolveOrigin();
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent('/configuracion/confirmar-desconectar-google')}`;
+  const { error: otpErr } = await supabase.auth.signInWithOtp({
+    email: currentEmail,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: redirectTo,
+    },
+  });
+  if (otpErr) {
+    console.warn('[requestGoogleUnlink] signInWithOtp failed', otpErr);
+    return { ok: false, errorKey: 'send_failed' };
+  }
+
+  return { ok: true };
+}
+
+export interface ConfirmGoogleUnlinkResult {
+  ok: boolean;
+  errorKey?:
+    | 'not_authenticated'
+    | 'fresh_sign_in_required'
+    | 'no_pending_change'
+    | 'pending_change_expired'
+    | 'not_linked'
+    | 'last_identity'
+    | 'unlink_failed'
+    | 'unknown';
+}
+
+/**
+ * Step 2 of the bank-grade disconnect-Google flow (ADR-003).
+ *
+ * Five gates (all required) before `unlinkIdentity` is called:
+ *   1. Authenticated.
+ *   2. `last_sign_in_at` fresh (≤ FRESH_SIGN_IN_WINDOW_SECONDS).
+ *   3. `user_metadata.pendingUnlinkGoogleRequestedAt` set + not stale.
+ *   4. Google still linked (idempotency).
+ *   5. User has ≥ 2 identities total (don't strand them without sign-in).
+ *
+ * On success: clears the pending metadata, calls `unlinkIdentity` with
+ * the Google identity object, returns `{ok: true}`. The caller is
+ * expected to `revalidatePath('/configuracion')` and redirect to
+ * `/configuracion?unlinked=google` so the AccountCard re-renders with
+ * the updated identities list.
+ */
+export async function confirmGoogleUnlink(): Promise<ConfirmGoogleUnlinkResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    return { ok: false, errorKey: 'not_authenticated' };
+  }
+
+  const lastSignInIso = user.last_sign_in_at;
+  const lastSignInAge = lastSignInIso
+    ? (Date.now() - new Date(lastSignInIso).getTime()) / 1000
+    : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(lastSignInAge) || lastSignInAge > FRESH_SIGN_IN_WINDOW_SECONDS) {
+    return { ok: false, errorKey: 'fresh_sign_in_required' };
+  }
+
+  const metadata = user.user_metadata;
+  const pendingAtIso =
+    typeof metadata.pendingUnlinkGoogleRequestedAt === 'string'
+      ? metadata.pendingUnlinkGoogleRequestedAt
+      : null;
+  if (!pendingAtIso) {
+    return { ok: false, errorKey: 'no_pending_change' };
+  }
+  const pendingAgeSeconds = (Date.now() - new Date(pendingAtIso).getTime()) / 1000;
+  if (!Number.isFinite(pendingAgeSeconds) || pendingAgeSeconds > PENDING_CHANGE_TTL_SECONDS) {
+    await supabase.auth.updateUser({ data: { pendingUnlinkGoogleRequestedAt: null } }).catch(() => {
+      /* swallow — already failing, just being tidy */
+    });
+    return { ok: false, errorKey: 'pending_change_expired' };
+  }
+
+  const identities = user.identities ?? [];
+  const googleIdentity = identities.find((i) => i.provider === 'google');
+  if (!googleIdentity) {
+    await supabase.auth.updateUser({ data: { pendingUnlinkGoogleRequestedAt: null } }).catch(() => {
+      /* swallow — already failing, just being tidy */
+    });
+    return { ok: false, errorKey: 'not_linked' };
+  }
+  if (identities.length < 2) {
+    await supabase.auth.updateUser({ data: { pendingUnlinkGoogleRequestedAt: null } }).catch(() => {
+      /* swallow — already failing, just being tidy */
+    });
+    return { ok: false, errorKey: 'last_identity' };
+  }
+
+  const { error: unlinkErr } = await supabase.auth.unlinkIdentity(googleIdentity);
+  if (unlinkErr) {
+    console.warn('[confirmGoogleUnlink] unlinkIdentity failed', unlinkErr);
+    return { ok: false, errorKey: 'unlink_failed' };
+  }
+
+  await supabase.auth.updateUser({ data: { pendingUnlinkGoogleRequestedAt: null } }).catch(() => {
+    /* best-effort cleanup; unlink already succeeded */
+  });
+
+  revalidatePath('/configuracion');
+  return { ok: true };
+}
+
 async function resolveOrigin(): Promise<string> {
   /*
    * Prefer the live request's origin so dev (localhost), preview
