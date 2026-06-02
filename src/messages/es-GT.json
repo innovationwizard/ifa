@@ -702,8 +702,6 @@
             "send_failed": "No pudimos mandar el enlace. Intenta de nuevo en un minuto.",
             "unknown": "Algo falló. Intenta de nuevo."
           },
-          "passwordSectionTitle": "Contraseña",
-          "passwordPlaceholder": "Próximamente",
           "confirmPage": {
             "readyTitle": "Confirma el cambio de correo",
             "readyBody": "Vas a cambiar tu correo a {newEmail}. Te mandaremos otro enlace al correo nuevo para terminar.",
@@ -726,6 +724,23 @@
               },
               "retryCta": "Volver a configuración"
             }
+          }
+        },
+        "signInMethods": {
+          "sectionTitle": "Métodos para entrar",
+          "description": "Así te puedes meter a IFA. Pronto vas a poder conectar o desconectar Google.",
+          "listLabel": "Lista de métodos de inicio de sesión",
+          "alwaysOn": "Siempre activo",
+          "soonAction": "Próximamente vas a poder activar y desactivar Google desde aquí.",
+          "magicLink": {
+            "label": "Correo con enlace mágico",
+            "detail": "Te mandamos un enlace al correo {email}. Lo abres y entras."
+          },
+          "google": {
+            "label": "Google",
+            "detail": "Entra con tu cuenta de Google sin escribir contraseña.",
+            "statusConnected": "Conectado",
+            "statusOff": "No conectado"
           }
         }
       },

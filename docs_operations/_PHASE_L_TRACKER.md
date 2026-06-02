@@ -55,16 +55,11 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L3 — Settings (account hygiene)
-- **Active sub-batch:** L3.4 — DONE locally (bank-grade email-change two-step flow per ADR-003), awaiting founder commit + push
-- **Last commit relevant to Phase L:** `5a02b25` (ADR-003 bank-grade security posture). L3.4 implements ADR-003 for email changes specifically.
-- **Next concrete action:** Founder commits L3.4. After push, this doc advances to L3.5 (password reset). L3.5 inherits ADR-003 by default — same tightest-security posture; will surface implementation question on entry.
-- **Blockers:** §6.2 (email-change re-auth) RESOLVED 2026-06-01 via ADR-003 (tightest posture; magic-link + last_sign_in_at freshness + new-email confirmation).
-- **Files in flight (uncommitted edits):**
-  - `src/app/(app)/configuracion/actions.ts` (extended: `requestEmailChange` + `confirmEmailChange`)
-  - `src/components/settings/account-card.tsx` (new)
-  - `src/app/(app)/configuracion/confirmar-cambio-correo/page.tsx` (new — step-2 confirmation route)
-  - `src/app/(app)/configuracion/page.tsx` (wired `<AccountCard>`)
-  - `src/messages/es-GT.json` (new `settings.account.email.*` block)
+- **Active sub-batch:** L3.5 — DONE locally (read-only sign-in methods display)
+- **Last commit relevant to Phase L:** `d180d2c` (L3.4 bank-grade email change)
+- **Next concrete action:** Founder commits L3.5. After push, this doc advances to L3.5.5 (connect Google with magic-link re-auth gate). L3.5.5 will reuse the L3.4 confirmation-page pattern: separate route at `/configuracion/confirmar-conectar-google` or similar, gated by `last_sign_in_at` freshness + pending-action metadata. After successful re-auth, server calls `supabase.auth.linkIdentity({provider: 'google'})` which initiates the OAuth round trip.
+- **Blockers:** none.
+- **Files in flight (uncommitted edits):** `src/components/settings/account-card.tsx` (added `googleLinked` prop + `MethodRow` subcomponent + sign-in methods section replacing the password placeholder) + `src/app/(app)/configuracion/page.tsx` (derives googleLinked from `user.identities`) + `src/messages/es-GT.json` (removed dead `passwordSectionTitle`/`passwordPlaceholder` keys; added `settings.account.signInMethods.*` block).
 
 ---
 
@@ -134,8 +129,10 @@ You are picking up Phase L work from cold context. Do these steps in order:
 - [x] **L3.1** — Schema: add `Profile.deletedAt` + `ProfileMember.deletedAt` if not already there; `pnpm db:push` _(code shipped; `db:push` against prod is a founder action that follows the push)_ · `2212dfb` · 2026-06-01
 - [x] **L3.2** — `src/app/(app)/configuracion/page.tsx`: shell with 4 sections · `8bb12a4` · 2026-06-01
 - [x] **L3.3** — `src/components/settings/profile-card.tsx` + `updateProfile` action · `dc5b542` · 2026-06-01
-- [ ] **L3.4** — `src/components/settings/account-card.tsx`: email change flow (re-auth required)
-- [ ] **L3.5** — `src/components/settings/account-card.tsx`: password reset trigger (Supabase default for L3; L4 may brand)
+- [x] **L3.4** — `src/components/settings/account-card.tsx`: email change flow (re-auth required) · bank-grade two-step per ADR-003 (magic-link to current email + 60s freshness gate + new-email confirmation; 3 independent factors). · `d180d2c` · 2026-06-01
+- [ ] **L3.5** — `<AccountCard>` sign-in methods: read-only display of linked identities (magic-link email + Google linked/not). _(Rescoped from "password reset trigger" 2026-06-01 — IFA is passwordless. Founder chose "sign-in methods" reframe, split into L3.5/L3.5.5/L3.5.6.)_
+- [ ] **L3.5.5** — `<AccountCard>` connect Google: re-auth-gated link flow via magic link to current email, then Supabase OAuth round trip.
+- [ ] **L3.5.6** — `<AccountCard>` disconnect Google: re-auth-gated unlink flow per ADR-003 (potential lockout vector → tightest care).
 - [ ] **L3.6** — `src/components/settings/data-card.tsx` + `exportData` action (ZIP: transactions.csv + health_scores.csv + profile.json)
 - [ ] **L3.7** — `src/components/settings/delete-card.tsx` + `softDelete` action (type-email-to-confirm)
 - [ ] **L3.8** — `src/lib/db/repositories/profile.ts` (extend): `softDelete(profileId)` + `deletedAt: null` filter on `findById` etc.
@@ -245,6 +242,8 @@ Each entry is one line: `YYYY-MM-DD HH:MM — L?.? closed — <sha> — <one-lin
 Newest at top. Never delete; append only.
 
 - 2026-06-01 — **L2 BATCH CLOSED PARTIALLY via L2.11** — `ef79340` — 8 sub-batches shipped (L2.1 → L2.8 + L2.6.5). 3 sub-batches carried forward as documented debt: L2.8.5 (real-fixture pdf-extract tests), L2.9 (founder samples), L2.10 (PDF e2e). All blocked on §6.1 founder outreach. Full partial gate sweep: vitest 619/619, playwright chromium 41/41, next build ✓, typecheck ✓, lint 0 errors. Net code added in L2: pdf-extract module + ai-detect prose-mode + extractor PDF entry + parse-pdf route + 4 test files + 3 i18n keys + wizard PDF branch + 1 dep (unpdf) + 1 deep-research-driven decision doc. PDF preview-UI adaptation noted as known-limitation post-L2.
+- 2026-06-01 — L3.4 closed — `d180d2c` — bank-grade email change (per ADR-003): two-step flow with three independent factors (active session + magic-link click to CURRENT email proving fresh access + Supabase confirmation link on NEW email). `actions.ts` extended (`requestEmailChange` + `confirmEmailChange`); new `<AccountCard>` client component (step 1 form); new `/configuracion/confirmar-cambio-correo` server-component page (step 2 gates: auth + last_sign_in_at ≤60s + pending-change metadata ≤15min). ~25 new i18n keys. 619/619 tests still pass.
+- 2026-06-01 — ADR-003 — `5a02b25` — bank-grade security posture locked: tightest always, never "good enough for MVP". Companion memory `feedback_security_posture.md` for future Claude sessions.
 - 2026-06-01 — L3.3 closed — `dc5b542` — Perfil section (`src/app/(app)/configuracion/actions.ts` new + `src/components/settings/profile-card.tsx` new + page.tsx wiring + i18n); `updateProfile` server action (Zod-validated displayName/dpiNumber/dateOfBirth); 4-state client form (idle / submitting / saved / error); revalidates `/configuracion` + `/dashboard` (dashboard greets by displayName). 619/619 tests still pass.
 - 2026-06-01 — Interjection (Prisma config) — `ed2d5a8` — migrated `package.json#prisma#seed` → `prisma.config.ts` to address Prisma 7 deprecation warning. Minimum-change: only seed command moves; schema path + datasource URL keep defaults. Verified by `pnpm db:generate` → "Loaded Prisma config from prisma.config.ts" (warning gone). Behavior note: Prisma now skips auto-loading .env when a config file is present; we already wrap with `dotenv -e .env.local --` in every `pnpm db:*` script so this is unaffected.
 - 2026-06-01 — L3.2 closed — `8bb12a4` — `/configuracion` shell (`src/app/(app)/configuracion/page.tsx`); replaced ModulePlaceholder with 4-section Card shell (Perfil → Cuenta → Tus datos → Eliminar, delete last so user scrolls past everything else first); new `settings.*` i18n block; new `tests/e2e/configuracion.spec.ts` auth-proxy spec (1 test).

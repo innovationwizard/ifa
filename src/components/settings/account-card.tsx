@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader2, Mail } from 'lucide-react';
+import { CheckCircle2, Loader2, Mail, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { requestEmailChange } from '@/app/(app)/configuracion/actions';
 
@@ -27,12 +27,19 @@ import { requestEmailChange } from '@/app/(app)/configuracion/actions';
 
 export interface AccountCardProps {
   currentEmail: string;
+  /**
+   * L3.5 read-only display: whether the user has Google OAuth linked.
+   * Page derives this from `user.identities.some(i => i.provider === 'google')`.
+   * Connect/disconnect actions land in L3.5.5/L3.5.6.
+   */
+  googleLinked: boolean;
 }
 
 type EmailStatus = { kind: 'idle' } | { kind: 'link-sent' } | { kind: 'error'; errorKey: string };
 
-export function AccountCard({ currentEmail }: AccountCardProps) {
+export function AccountCard({ currentEmail, googleLinked }: AccountCardProps) {
   const t = useTranslations('settings.account.email');
+  const tMethods = useTranslations('settings.account.signInMethods');
   const [newEmail, setNewEmail] = useState('');
   const [status, setStatus] = useState<EmailStatus>({ kind: 'idle' });
   const [isSending, startSending] = useTransition();
@@ -121,14 +128,72 @@ export function AccountCard({ currentEmail }: AccountCardProps) {
       </section>
 
       {/*
-       * Password section — Phase L3.5 will replace this placeholder
-       * with the branded password-reset trigger. Kept inline so the
-       * Cuenta section card layout stays whole.
+       * Sign-in methods (Phase L3.5 read-only display). IFA's auth
+       * is passwordless — magic-link is always present; Google OAuth
+       * is opt-in via Sign-In With Google. L3.5.5/L3.5.6 add the
+       * connect/disconnect mutations behind ADR-003 re-auth gates.
        */}
-      <section className="border-ifa-gray-200 flex flex-col gap-2 border-t pt-4">
-        <h3 className="text-ifa-navy-900 text-sm font-medium">{t('passwordSectionTitle')}</h3>
-        <p className="text-ifa-gray-700 text-xs">{t('passwordPlaceholder')}</p>
+      <section className="border-ifa-gray-200 flex flex-col gap-3 border-t pt-4">
+        <header className="flex flex-col gap-1">
+          <h3 className="text-ifa-navy-900 text-sm font-medium">{tMethods('sectionTitle')}</h3>
+          <p className="text-ifa-gray-700 text-xs">{tMethods('description')}</p>
+        </header>
+
+        <ul className="divide-ifa-gray-200 divide-y" aria-label={tMethods('listLabel')}>
+          {/*
+           * Magic-link via the user's current email — always
+           * available because Supabase passwordless auth uses
+           * the email-OTP provider for every account.
+           */}
+          <MethodRow
+            label={tMethods('magicLink.label')}
+            detail={tMethods('magicLink.detail', { email: currentEmail })}
+            statusLabel={tMethods('alwaysOn')}
+            statusKind="on"
+          />
+          <MethodRow
+            label={tMethods('google.label')}
+            detail={tMethods('google.detail')}
+            statusLabel={
+              googleLinked ? tMethods('google.statusConnected') : tMethods('google.statusOff')
+            }
+            statusKind={googleLinked ? 'on' : 'off'}
+          />
+        </ul>
+
+        <p className="text-ifa-gray-500 text-xs">{tMethods('soonAction')}</p>
       </section>
     </div>
+  );
+}
+
+function MethodRow({
+  label,
+  detail,
+  statusLabel,
+  statusKind,
+}: {
+  label: string;
+  detail: string;
+  statusLabel: string;
+  statusKind: 'on' | 'off';
+}) {
+  const Icon = statusKind === 'on' ? CheckCircle2 : XCircle;
+  const iconColor = statusKind === 'on' ? 'text-ifa-teal-700' : 'text-ifa-gray-500';
+  return (
+    <li className="flex items-start gap-3 py-3">
+      <Icon className={`${iconColor} mt-0.5 size-4 shrink-0`} aria-hidden />
+      <div className="flex flex-1 flex-col gap-0.5">
+        <span className="text-ifa-navy-900 text-sm font-medium">{label}</span>
+        <span className="text-ifa-gray-700 text-xs">{detail}</span>
+      </div>
+      <span
+        className={`shrink-0 text-xs font-medium tracking-wide uppercase ${
+          statusKind === 'on' ? 'text-ifa-teal-700' : 'text-ifa-gray-500'
+        }`}
+      >
+        {statusLabel}
+      </span>
+    </li>
   );
 }

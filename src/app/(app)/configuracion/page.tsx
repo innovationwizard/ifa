@@ -107,8 +107,16 @@ export default async function ConfiguracionPage() {
                  * fall back to empty string for defensive type
                  * narrowing only (will surface as an obviously-
                  * wrong UI rather than a crash if it ever does).
+                 *
+                 * L3.5 adds `googleLinked` — derived from
+                 * `user.identities` (Supabase populates this on
+                 * every getUser() call). Connect/disconnect
+                 * mutations land in L3.5.5/L3.5.6.
                  */
-                <AccountCard currentEmail={user.email ?? ''} />
+                <AccountCard
+                  currentEmail={user.email ?? ''}
+                  googleLinked={(user.identities ?? []).some((i) => i.provider === 'google')}
+                />
               ) : (
                 /*
                  * L3.3 + L3.4 replaced Perfil and Cuenta. L3.5–L3.7
