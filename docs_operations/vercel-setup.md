@@ -43,6 +43,109 @@ All three routes **fail-closed** when `CRON_SECRET` is unset — they return 401
 
 Rotate on leak. After rotation, redeploy production so the new value is picked up by the route handlers (Vercel does this automatically on env-var change).
 
+## 2.5 Transactional email (Phase L4 — provider-agnostic)
+
+IFA's email layer supports BOTH **Resend** and **AWS SES**. Pick one per environment via `EMAIL_PROVIDER`. The same `sendEmail()` API works against either — swapping later is an env-var change, not a code edit. When `EMAIL_PROVIDER` is unset, the app runs in "email-disabled" mode (sends are logged + skipped). This is the only mode that ships without configuration; pick a provider before opening signups to anyone outside your phone contacts.
+
+There are **two distinct surfaces** that send email:
+
+1. **Supabase Auth emails** (magic links, email-change confirmations, OTP for delete confirmation). These are sent by Supabase, not by our code. To brand them with our domain, configure Supabase's **Custom SMTP** to relay through Resend or SES — instructions below.
+2. **App-level transactional emails** (welcome, deletion receipt, billing, etc.). These go through our `sendEmail()` helper at `src/lib/email`. No code calls it today (L4 ships the foundation only); L5+ will wire callsites as features need them.
+
+You can configure surface #1 without #2 (Supabase SMTP relay only) or both — they're independent.
+
+### 2.5.A Choose a provider
+
+|                | **Resend**                    | **AWS SES**                                       |
+| -------------- | ----------------------------- | ------------------------------------------------- |
+| Setup time     | 10 min                        | 30 min (IAM + production access request)          |
+| Free tier      | 100/day, 3 000/mo             | 200/day from EC2 only; 62 000/mo if sent from EC2 |
+| Paid pricing   | $20/mo + $0.001/extra         | $0.10 per 1 000 emails                            |
+| Region         | Global                        | Pick one (we recommend `us-east-1`)               |
+| DKIM/SPF setup | Resend dashboard guides you   | Manual DNS in Route 53 / your registrar           |
+| Best for       | MVP / friends-and-family beta | Scale (hundreds of thousands/mo)                  |
+
+The recommendation for the friends-and-family beta is **Resend** for the relay AND `EMAIL_PROVIDER=resend` in the codebase. Migrate to SES only when monthly volume × Resend's $0.001 starts to matter.
+
+### 2.5.B Set the env vars (both providers)
+
+Three vars are always required when `EMAIL_PROVIDER` is set:
+
+| Variable             | Purpose                                                                                                                      |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `EMAIL_PROVIDER`     | `resend` or `ses`                                                                                                            |
+| `EMAIL_FROM_ADDRESS` | The sender address. **Must be DKIM/SPF-verified at the chosen provider**, otherwise sends bounce. Example: `noreply@ifa.gt`. |
+| `EMAIL_FROM_NAME`    | Display name shown in the From header. Example: `IFA`.                                                                       |
+
+Plus the provider-specific creds:
+
+**For Resend** (`EMAIL_PROVIDER=resend`):
+
+| Variable         | Purpose                                                                           |
+| ---------------- | --------------------------------------------------------------------------------- |
+| `RESEND_API_KEY` | From [resend.com](https://resend.com) → API Keys. Scope to "Sending access" only. |
+
+**For AWS SES** (`EMAIL_PROVIDER=ses`):
+
+| Variable                    | Purpose                                                                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AWS_SES_REGION`            | The SES region you provisioned. Example: `us-east-1`.                                                                                               |
+| `AWS_SES_ACCESS_KEY_ID`     | IAM user access key. The IAM user should have ONLY the `AmazonSesSendingAccess` AWS-managed policy. Never use root credentials or a broader policy. |
+| `AWS_SES_SECRET_ACCESS_KEY` | Paired secret.                                                                                                                                      |
+
+> The AWS keys are deliberately namespaced `AWS_SES_*` (not the standard `AWS_*`) so they don't collide with other AWS integrations on the same Vercel project.
+
+### 2.5.C Set up Resend (recommended path)
+
+1. Sign up at [resend.com](https://resend.com).
+2. Add your sending domain in **Domains** → click your domain → copy the SPF, DKIM, and DMARC records into your DNS provider. Wait for "Verified" status (usually < 10 min).
+3. **API Keys** → Create API key → scope: "Sending access" → copy the `re_*` key.
+4. Set Vercel env vars: `EMAIL_PROVIDER=resend`, `RESEND_API_KEY=re_...`, `EMAIL_FROM_ADDRESS=noreply@your-domain`, `EMAIL_FROM_NAME=IFA`.
+
+### 2.5.D Set up AWS SES (when scale demands it)
+
+1. AWS Console → SES → pick a region (typically `us-east-1`).
+2. **Verified identities** → add your sending domain → publish the DKIM CNAMEs SES gives you to your DNS provider.
+3. **Request production access** (new accounts start in sandbox: only verified recipients can receive). Approval usually takes 24 hours.
+4. IAM → create a dedicated user (e.g. `ifa-ses-sender`) → attach the AWS-managed policy `AmazonSesSendingAccess` → create access keys → copy the key + secret.
+5. Set Vercel env vars: `EMAIL_PROVIDER=ses`, `AWS_SES_REGION=us-east-1`, `AWS_SES_ACCESS_KEY_ID=...`, `AWS_SES_SECRET_ACCESS_KEY=...`, `EMAIL_FROM_ADDRESS=noreply@your-domain`, `EMAIL_FROM_NAME=IFA`.
+
+### 2.5.E Wire Supabase Auth to use the same provider (Custom SMTP)
+
+Both Resend and SES expose SMTP endpoints. Supabase's **Auth → Emails → SMTP Settings** form accepts either — same fields, different host/port.
+
+Open the Supabase dashboard → **Authentication** → **Emails** → **SMTP Settings** → enable **Custom SMTP**. Then fill in:
+
+**If using Resend SMTP relay:**
+
+| Field        | Value                                                |
+| ------------ | ---------------------------------------------------- |
+| Sender email | matches `EMAIL_FROM_ADDRESS` (e.g. `noreply@ifa.gt`) |
+| Sender name  | `IFA`                                                |
+| Host         | `smtp.resend.com`                                    |
+| Port         | `465` (SSL) — or `587` (STARTTLS)                    |
+| Username     | `resend` (literal string)                            |
+| Password     | the same `re_*` API key from §2.5.C                  |
+
+**If using AWS SES SMTP relay:**
+
+| Field        | Value                                                                                                                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sender email | matches `EMAIL_FROM_ADDRESS`                                                                                                                                                                   |
+| Sender name  | `IFA`                                                                                                                                                                                          |
+| Host         | `email-smtp.us-east-1.amazonaws.com` (substitute your region)                                                                                                                                  |
+| Port         | `587` (STARTTLS)                                                                                                                                                                               |
+| Username     | SMTP username — **NOT** the IAM access key. Generate via AWS Console → SES → **SMTP settings** → Create SMTP credentials. SES gives you a different username/password pair than the SDK creds. |
+| Password     | the paired SMTP password from the same SES creds page                                                                                                                                          |
+
+After saving, **Authentication → Email Templates** → edit each template (Confirm signup, Magic Link, Change Email Address, Reset Password, Invite user) into es-GT, tú-register. Keep the `{{ .ConfirmationURL }}` placeholder intact — Supabase substitutes it at send time. See §2.5.F for the recommended copy.
+
+### 2.5.F Verify and rotate
+
+After configuring, trigger a magic link from `/ingresar` and inspect the message: it must come from `EMAIL_FROM_ADDRESS`, be branded "IFA", and have a clean DMARC pass in Gmail's "Show original".
+
+Rotate credentials on suspected leak. After rotation, redeploy production (Vercel auto-redeploys on env-var change) so the cached HTTP/SMTP clients pick up the new value.
+
 ## 3. Configure the `ifa-demo` deployment (D-1.B)
 
 The demo deployment is a **separate Vercel project** (`ifa-demo`) that connects to a **separate, throwaway Supabase project**. This guarantees that DEMO mode cannot contaminate production data (Rule 4 + plan §S-10.7).

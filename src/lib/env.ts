@@ -108,6 +108,65 @@ export function getServerEnv(): {
  * checkout route errors with a clear message so misconfiguration surfaces
  * loudly instead of silently falling back to trial-only mode.
  */
+/**
+ * Transactional-email env (Phase L4) — OPTIONAL by design, mirroring
+ * `getStripeEnv()`. Returns `null` when no provider is configured so
+ * the app runs in "email-disabled" mode during early development.
+ * The `sendEmail` wrapper logs + skips when this is null (rather than
+ * throwing) so missing email config never breaks user-facing flows.
+ *
+ * Required when configured:
+ *   - EMAIL_PROVIDER             'resend' | 'ses'
+ *   - EMAIL_FROM_ADDRESS         e.g. `noreply@ifa.gt`
+ *   - EMAIL_FROM_NAME            display name, e.g. `IFA`
+ *
+ * Resend (`EMAIL_PROVIDER=resend`):
+ *   - RESEND_API_KEY             `re_*` from resend.com → API Keys
+ *
+ * AWS SES (`EMAIL_PROVIDER=ses`):
+ *   - AWS_SES_REGION             e.g. `us-east-1`
+ *   - AWS_SES_ACCESS_KEY_ID      IAM user with `ses:SendEmail` only
+ *   - AWS_SES_SECRET_ACCESS_KEY  paired secret
+ *
+ * Note: we use namespaced AWS_SES_* vars (not the default AWS_* vars)
+ * so the SES credentials never leak into other AWS SDK calls and so
+ * a Vercel project can have multiple AWS integrations without
+ * collision.
+ */
+export function getEmailEnv(): {
+  provider: 'resend' | 'ses';
+  fromAddress: string;
+  fromName: string;
+  resendApiKey: string | null;
+  awsSesRegion: string | null;
+  awsSesAccessKeyId: string | null;
+  awsSesSecretAccessKey: string | null;
+} | null {
+  if (typeof window !== 'undefined') {
+    throw new Error(
+      'getEmailEnv() called from a client bundle. Split the import so only ' +
+        'server code touches email secrets.',
+    );
+  }
+  const rawProvider = process.env.EMAIL_PROVIDER;
+  if (!rawProvider) return null;
+  if (rawProvider !== 'resend' && rawProvider !== 'ses') {
+    throw new Error(
+      `EMAIL_PROVIDER must be 'resend' or 'ses' (got '${rawProvider}'). ` +
+        `See docs_operations/vercel-setup.md.`,
+    );
+  }
+  return {
+    provider: rawProvider,
+    fromAddress: requireServerEnv('EMAIL_FROM_ADDRESS', process.env.EMAIL_FROM_ADDRESS),
+    fromName: requireServerEnv('EMAIL_FROM_NAME', process.env.EMAIL_FROM_NAME),
+    resendApiKey: process.env.RESEND_API_KEY ?? null,
+    awsSesRegion: process.env.AWS_SES_REGION ?? null,
+    awsSesAccessKeyId: process.env.AWS_SES_ACCESS_KEY_ID ?? null,
+    awsSesSecretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY ?? null,
+  };
+}
+
 export function getStripeEnv(): {
   secretKey: string;
   webhookSecret: string | null;

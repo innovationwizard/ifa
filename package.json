@@ -50,6 +50,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
+    "@aws-sdk/client-sesv2": "^3.1059.0",
     "@hookform/resolvers": "^5.2.2",
     "@prisma/client": "^6.19.3",
     "@supabase/ssr": "^0.10.2",
@@ -69,6 +70,7 @@
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.73.1",
     "recharts": "^3.8.1",
+    "resend": "^6.12.4",
     "shadcn": "^4.3.1",
     "sonner": "^2.0.7",
     "stripe": "^22.0.2",
