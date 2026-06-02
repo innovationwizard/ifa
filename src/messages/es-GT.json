@@ -838,6 +838,47 @@
           }
         }
       },
+      "billing": {
+        "title": "Facturación",
+        "description": "Tu plan, próximo cobro y método de pago.",
+        "manageCta": "Ver detalles de facturación",
+        "pageTitle": "Facturación",
+        "pageSubtitle": "Tu plan actual y tu método de pago.",
+        "backToSettings": "Volver a configuración",
+        "currentPlanTitle": "Tu plan",
+        "legalFootnote": "Las transacciones se procesan en Stripe (USD). Tu banco puede aplicar conversión de moneda.",
+        "status": {
+          "early_supporter": "Plan Early Supporter — gracias por confiar en IFA desde el inicio.",
+          "active": "Plan activo. Estás al día con tu suscripción.",
+          "trial_active": "Te quedan {days, plural, =0 {menos de un día} =1 {1 día} other {# días}} de prueba gratis.",
+          "canceled_in_grace": "Cancelaste tu suscripción. Sigues con acceso por {days, plural, =0 {menos de un día} =1 {1 día} other {# días}}.",
+          "past_due_soft_window": "Tu último pago no entró. Tienes {days, plural, =0 {menos de un día} =1 {1 día} other {# días}} para actualizar tu tarjeta.",
+          "trial_expired_soft_window": "Tu prueba ya terminó. Tienes {days, plural, =0 {menos de un día} =1 {1 día} other {# días}} para suscribirte y seguir usando IFA.",
+          "trial_expired_hard": "Tu prueba terminó. Suscríbete para volver a usar IFA.",
+          "expired": "Tu acceso terminó. Suscríbete para volver a usar IFA."
+        },
+        "pageStatus": {
+          "early_supporter": "Eres parte del grupo Early Supporter. No te vamos a cobrar mientras IFA siga creciendo.",
+          "active": "Tu suscripción está activa. Próximo cobro: {date}.",
+          "trial_active": "Estás en tu prueba gratis. Te quedan {days, plural, =0 {menos de un día} =1 {1 día} other {# días}} (termina el {date}).",
+          "canceled_in_grace": "Cancelaste tu suscripción. Sigues teniendo acceso hasta el {date} ({days, plural, =0 {menos de un día} =1 {1 día} other {# días}} más).",
+          "past_due_soft_window": "Tu último pago no entró. Actualiza tu tarjeta antes de que terminen los {days, plural, =0 {menos de un día} =1 {1 día} other {# días}} de gracia o vas a perder acceso.",
+          "trial_expired_soft_window": "Tu prueba terminó pero tienes {days, plural, =0 {menos de un día} =1 {1 día} other {# días}} más de acceso. Suscríbete para no perderlo.",
+          "trial_expired_hard": "Tu prueba ya terminó y se acabó el tiempo extra. Suscríbete para volver a usar IFA.",
+          "expired": "Tu acceso terminó. Suscríbete para usar IFA otra vez."
+        },
+        "manage": {
+          "subscribeIntro": "Suscríbete por $1 USD al mes para mantener tu acceso después de la prueba.",
+          "subscribeCta": "Suscribirme",
+          "portalIntro": "Cambia tu tarjeta, descarga facturas o cancela tu suscripción desde el portal de Stripe.",
+          "portalCta": "Gestionar pago",
+          "opening": "Abriendo…",
+          "error": {
+            "generic": "Algo falló. Intenta otra vez en un momento.",
+            "notReady": "Los pagos todavía no están activados. Te avisaremos cuando lo estén."
+          }
+        }
+      },
       "data": {
         "title": "Tus datos",
         "description": "Descarga todo lo que tenemos guardado de ti.",

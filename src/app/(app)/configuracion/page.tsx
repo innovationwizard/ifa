@@ -2,11 +2,13 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountCard } from '@/components/settings/account-card';
+import { BillingCard } from '@/components/settings/billing-card';
 import { DataCard } from '@/components/settings/data-card';
 import { DeleteCard } from '@/components/settings/delete-card';
 import { ProfileCard } from '@/components/settings/profile-card';
 import { getCurrentUser } from '@/lib/auth/server';
 import { profileRepo } from '@/lib/db/repositories';
+import { computeGateState } from '@/lib/billing/gate';
 
 /**
  * `/configuracion` — settings page shell (Phase L3.2).
@@ -68,6 +70,13 @@ export default async function ConfiguracionPage({
   const identityCount = identities.length;
 
   /*
+   * L5 billing summary: compute the gate state once and pass it down
+   * to the BillingCard. The same state drives the (app) layout's
+   * paywall banner, but we recompute here so each card is independent.
+   */
+  const gateState = computeGateState(profile);
+
+  /*
    * Format the Profile.dateOfBirth (DateTime? @db.Date) as the
    * YYYY-MM-DD string the <input type="date"> expects. UTC slice
    * is safe because the column has no time component.
@@ -78,9 +87,9 @@ export default async function ConfiguracionPage({
 
   /*
    * Section list in render order. The order matches the user's
-   * mental model: identity (Perfil) → access (Cuenta) → ownership
-   * (Tus datos) → exit (Eliminar). Delete is last so the user
-   * scrolls past their other options first.
+   * mental model: identity (Perfil) → access (Cuenta) → billing
+   * (Facturación) → ownership (Tus datos) → exit (Eliminar).
+   * Delete is last so the user scrolls past their other options first.
    */
   const sections = [
     {
@@ -92,6 +101,11 @@ export default async function ConfiguracionPage({
       key: 'account',
       title: t('sections.account.title'),
       description: t('sections.account.description'),
+    },
+    {
+      key: 'billing',
+      title: t('sections.billing.title'),
+      description: t('sections.billing.description'),
     },
     {
       key: 'data',
@@ -150,6 +164,8 @@ export default async function ConfiguracionPage({
                   unlinkError={unlinkErrorParam}
                   unlinkedJustNow={unlinkedJustNow}
                 />
+              ) : section.key === 'billing' ? (
+                <BillingCard gateState={gateState} />
               ) : section.key === 'data' ? (
                 <DataCard />
               ) : (

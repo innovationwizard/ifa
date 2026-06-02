@@ -146,6 +146,77 @@ After configuring, trigger a magic link from `/ingresar` and inspect the message
 
 Rotate credentials on suspected leak. After rotation, redeploy production (Vercel auto-redeploys on env-var change) so the cached HTTP/SMTP clients pick up the new value.
 
+## 2.6 Stripe billing (Phase L5 — live keys, day-one)
+
+IFA bills $1 USD/month for INDIVIDUAL and $20 USD/month for BUSINESS. The codebase is fully wired (checkout, customer portal, webhook with bulletproof idempotency). What's missing is the founder-side configuration in the Stripe dashboard, listed below.
+
+> **Test mode vs live mode.** The founder's decision (2026-06-02) is **live keys from day one**. Test customers do NOT carry over to live, so any test-mode dry-runs must happen on a separate Stripe test account. Don't mix.
+
+### 2.6.A Create products + prices in Stripe (live mode)
+
+1. Sign in to [dashboard.stripe.com](https://dashboard.stripe.com), toggle to **Live mode** (top right).
+2. **Products** → **Add product**.
+   - Name: `IFA Individual`
+   - Pricing model: **Recurring**
+   - Price: `$1.00 USD` / **Monthly**
+   - Click **Save product**. Copy the resulting price id (`price_*`) — this is `STRIPE_PRICE_INDIVIDUAL_ID`.
+3. Repeat for `IFA Business` at `$20.00 USD` / Monthly. Copy that price id as `STRIPE_PRICE_BUSINESS_ID`.
+
+### 2.6.B Enable Stripe-sent invoice emails
+
+Founder decision (2026-06-02): Stripe sends the official receipt. No app-level receipt code (deferred to a later L4 callsite if branded receipts become a priority).
+
+1. **Settings → Invoices** → **Customer emails**.
+2. Toggle ON: **Email invoices to customers**.
+3. Toggle ON: **Email finalized invoices to customers**.
+4. (Optional but recommended) Customize the invoice template's logo, color, footer in **Settings → Branding**.
+
+### 2.6.C Configure the webhook endpoint
+
+1. **Developers → Webhooks** → **Add an endpoint**.
+2. Endpoint URL: `https://<your-domain>/api/stripe/webhook`. For Vercel preview deploys, also add a separate endpoint pointing at the preview URL pattern if you want preview-deploy testing.
+3. **Events to send**: select these five:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_succeeded`
+   - `invoice.payment_failed`
+4. **Add endpoint** → copy the **Signing secret** (`whsec_*`) — this is `STRIPE_WEBHOOK_SECRET`.
+
+> The webhook handler is idempotent (every event id is recorded in `stripe_event_logs` inside a `$transaction` — duplicate deliveries are no-ops). Safe to leave Stripe's automatic retries enabled.
+
+### 2.6.D Set the Vercel env vars
+
+Production scope:
+
+| Variable                     | Value                                                    |
+| ---------------------------- | -------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`          | live secret (`sk_live_*`) from **Developers → API keys** |
+| `STRIPE_WEBHOOK_SECRET`      | from §2.6.C                                              |
+| `STRIPE_PRICE_INDIVIDUAL_ID` | from §2.6.A (Individual product)                         |
+| `STRIPE_PRICE_BUSINESS_ID`   | from §2.6.A (Business product)                           |
+
+After saving, redeploy production so the Stripe client picks up the new env (Vercel does this automatically on env-var change).
+
+### 2.6.E Verify
+
+1. Go to `/precios` while signed in → click "Pasar a este plan" on Individual → Stripe Checkout opens.
+2. Pay with a real card. The webhook fires; check Stripe dashboard → **Developers → Events** for the matching `checkout.session.completed` and the 200 response from our endpoint.
+3. Visit `/configuracion/facturacion` — should show "Tu suscripción está activa".
+4. Click "Gestionar pago" → Stripe customer portal opens; verify you can update the card and cancel.
+5. (Optional, after a few minutes) check `select * from stripe_event_logs order by processed_at desc limit 10` in Supabase to confirm event ids landed.
+
+If anything fails: the webhook returns the error key in the JSON body — visible in Stripe → Developers → Events → click the failed event. Common issues:
+
+- `invalid_signature`: `STRIPE_WEBHOOK_SECRET` mismatch (re-copy from §2.6.C).
+- `billing_not_configured`: `STRIPE_SECRET_KEY` not set in production scope.
+- 500 with `handler_failed`: bug in our code; check the Vercel function logs.
+
+### 2.6.F Rotate
+
+If a secret key leaks: **Developers → API keys** → **Roll** → copy the new `sk_live_*` → update Vercel env → redeploy. The old key is invalidated immediately. For the webhook secret: re-add the endpoint and copy the new signing secret (Stripe doesn't expose rotation in-place for webhooks).
+
 ## 3. Configure the `ifa-demo` deployment (D-1.B)
 
 The demo deployment is a **separate Vercel project** (`ifa-demo`) that connects to a **separate, throwaway Supabase project**. This guarantees that DEMO mode cannot contaminate production data (Rule 4 + plan §S-10.7).

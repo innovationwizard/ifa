@@ -1199,3 +1199,38 @@ model PendingJob {
   @@index([type, status])
   @@map("pending_jobs")
 }
+
+/// Phase L5: bulletproof Stripe webhook idempotency.
+///
+/// Stripe retries webhook deliveries on any non-2xx response (and
+/// occasionally on network blips even after a 200). Without dedup,
+/// the same event could mutate Profile state more than once —
+/// catastrophic for billing semantics (a CANCELED → ACTIVE flip on
+/// retry, etc.).
+///
+/// The webhook handler runs every event inside a Prisma `$transaction`:
+///   1. INSERT row keyed by `id` (= Stripe `event.id`). ON CONFLICT,
+///      the insert is a no-op and we return 200 without re-running
+///      the business logic.
+///   2. Apply the Profile mutation in the SAME transaction.
+///   3. Commit. The event-log row and the Profile state are
+///      atomically consistent: either both land or neither.
+///
+/// Rows are never deleted. Stripe event IDs are 56-char strings;
+/// at ~10 events/customer/year × 100k customers = 1M rows/year,
+/// the table is harmless to leave growing for years before a cleanup
+/// job becomes necessary.
+model StripeEventLog {
+  /// Stripe's event id, e.g. `evt_1A2b3C4d...`. Length is not fixed
+  /// across API versions so we leave it untyped (String, no @db.VarChar).
+  id          String   @id
+  /// `event.type` mirrored for debugging / ops queries. Not used by
+  /// the handler logic — the `id` is the only thing the dedup gate
+  /// reads.
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+  @@index([eventType, processedAt])
+  @@map("stripe_event_logs")
+}
