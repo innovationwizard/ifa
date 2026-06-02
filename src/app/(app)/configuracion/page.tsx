@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AccountCard } from '@/components/settings/account-card';
 import { ProfileCard } from '@/components/settings/profile-card';
 import { getCurrentUser } from '@/lib/auth/server';
 import { profileRepo } from '@/lib/db/repositories';
@@ -99,9 +100,18 @@ export default async function ConfiguracionPage() {
                     dateOfBirth: dateOfBirthIso,
                   }}
                 />
+              ) : section.key === 'account' ? (
+                /*
+                 * L3.4 wires email change here. user.email is
+                 * always present for a signed-in Supabase user;
+                 * fall back to empty string for defensive type
+                 * narrowing only (will surface as an obviously-
+                 * wrong UI rather than a crash if it ever does).
+                 */
+                <AccountCard currentEmail={user.email ?? ''} />
               ) : (
                 /*
-                 * L3.3 replaced the Perfil placeholder. L3.4–L3.7
+                 * L3.3 + L3.4 replaced Perfil and Cuenta. L3.5–L3.7
                  * replace the remaining sections in turn.
                  */
                 <p className="text-ifa-gray-500 text-xs tracking-wide uppercase">

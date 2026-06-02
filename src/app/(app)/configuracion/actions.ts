@@ -1,18 +1,23 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { getCurrentUser } from '@/lib/auth/server';
+import { getCurrentUser, createSupabaseServerSideClient } from '@/lib/auth/server';
 import { profileRepo } from '@/lib/db/repositories';
+import { publicEnv } from '@/lib/env';
 
 /**
  * Server actions for `/configuracion` — Phase L3.3+.
  *
  * One action ships per L3 sub-batch:
  *   - updateProfile (L3.3) — this file.
- *   - L3.4 email change, L3.5 password reset, L3.6 data export,
- *     L3.7 account deletion all land later as sibling exports here.
+ *   - requestEmailChange + confirmEmailChange (L3.4) — this file.
+ *     Together they implement the bank-grade email-change flow
+ *     locked by [ADR-003](../../../../docs_operations/_DECISIONS.md#adr-003).
+ *   - L3.5 password reset, L3.6 data export, L3.7 account deletion
+ *     all land later as sibling exports here.
  *
  * Auth pattern mirrors `/dashboard/salud/actions.ts` (Phase 6/7 B13):
  * resolve user + profile per call, redirect to /ingresar or
@@ -126,4 +131,233 @@ export async function updateProfile(formData: FormData): Promise<UpdateProfileRe
 function stringFromForm(formData: FormData, key: string): string {
   const v = formData.get(key);
   return typeof v === 'string' ? v : '';
+}
+
+// ----------------------------------------------------------------------------
+// Email change — Phase L3.4 (ADR-003 bank-grade two-step flow).
+// ----------------------------------------------------------------------------
+
+/**
+ * Maximum age, in seconds, of the user's `last_sign_in_at` for
+ * `confirmEmailChange` to accept the request. The user is expected to
+ * complete the entire flow within this window after clicking the
+ * magic link sent to their current email. 60s matches the
+ * step-up-auth freshness windows that bank web apps typically
+ * accept; it's short enough to make session-theft replay impractical
+ * but long enough that a real user clicking + reading the
+ * confirmation page won't trip it.
+ */
+const FRESH_SIGN_IN_WINDOW_SECONDS = 60;
+
+/**
+ * Maximum age of the `pendingEmailChangeRequestedAt` metadata before
+ * the confirmation action refuses to proceed. 15 minutes lets the
+ * user click the magic-link email at their leisure but ensures stale
+ * pending changes (forgotten requests) don't get applied weeks
+ * later.
+ */
+const PENDING_CHANGE_TTL_SECONDS = 15 * 60;
+
+const EmailSchema = z.string().trim().toLowerCase().email();
+
+export interface RequestEmailChangeResult {
+  ok: boolean;
+  errorKey?:
+    | 'invalid_email'
+    | 'same_as_current'
+    | 'session_email_missing'
+    | 'send_failed'
+    | 'unknown';
+}
+
+/**
+ * Step 1 of the bank-grade email-change flow (ADR-003).
+ *
+ * User submits the new email. We:
+ *   1. Validate the new email syntactically.
+ *   2. Reject if it equals the user's current email (no-op + UX
+ *      friction).
+ *   3. Stash the pending change in `user_metadata.pendingEmailChange`
+ *      with a timestamp.
+ *   4. Send a magic link via `signInWithOtp` to the user's CURRENT
+ *      email (proof-of-possession factor). The magic link's
+ *      `emailRedirectTo` points at `/configuracion/confirmar-cambio-correo`,
+ *      our confirmation page (Phase L3.4 page route).
+ *
+ * On success the wizard tells the user "we sent a link to your
+ * current email — click it to continue." NO email change happens
+ * yet; the magic-link click is the gate.
+ */
+export async function requestEmailChange(formData: FormData): Promise<RequestEmailChangeResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) redirect('/ingresar');
+  const currentEmail = user.email;
+  if (!currentEmail) {
+    return { ok: false, errorKey: 'session_email_missing' };
+  }
+
+  const parsed = EmailSchema.safeParse(stringFromForm(formData, 'newEmail'));
+  if (!parsed.success) {
+    return { ok: false, errorKey: 'invalid_email' };
+  }
+  const newEmail = parsed.data;
+  if (newEmail === currentEmail.toLowerCase()) {
+    return { ok: false, errorKey: 'same_as_current' };
+  }
+
+  /*
+   * Persist the pending change in user_metadata. We deliberately
+   * use user_metadata (not app_metadata) because user_metadata is
+   * writable by the user's own session — exactly what we need here.
+   * Confidentiality isn't a concern: only the user themselves can
+   * read their own metadata.
+   */
+  const requestedAt = new Date().toISOString();
+  const { error: stashErr } = await supabase.auth.updateUser({
+    data: {
+      pendingEmailChange: newEmail,
+      pendingEmailChangeRequestedAt: requestedAt,
+    },
+  });
+  if (stashErr) {
+    console.warn('[requestEmailChange] metadata stash failed', stashErr);
+    return { ok: false, errorKey: 'unknown' };
+  }
+
+  /*
+   * Send the magic link to the CURRENT email. The link's
+   * `emailRedirectTo` lands the user on the confirmation page;
+   * Supabase's standard callback (`/auth/callback`) processes the
+   * sign-in token first then redirects there.
+   *
+   * `shouldCreateUser: false` because the email IS registered
+   * (it's the signed-in user's own address). Defense in depth: if
+   * something somehow doesn't match, we don't want to spin up a
+   * second account.
+   */
+  const origin = await resolveOrigin();
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent('/configuracion/confirmar-cambio-correo')}`;
+  const { error: otpErr } = await supabase.auth.signInWithOtp({
+    email: currentEmail,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: redirectTo,
+    },
+  });
+  if (otpErr) {
+    console.warn('[requestEmailChange] signInWithOtp failed', otpErr);
+    return { ok: false, errorKey: 'send_failed' };
+  }
+
+  return { ok: true };
+}
+
+export interface ConfirmEmailChangeResult {
+  ok: boolean;
+  errorKey?:
+    | 'not_authenticated'
+    | 'fresh_sign_in_required'
+    | 'no_pending_change'
+    | 'pending_change_expired'
+    | 'update_failed'
+    | 'unknown';
+}
+
+/**
+ * Step 2 of the bank-grade email-change flow (ADR-003).
+ *
+ * Runs from the confirmation page after the user clicks the magic
+ * link in their CURRENT email. We:
+ *   1. Verify the session is fresh — `last_sign_in_at` within
+ *      `FRESH_SIGN_IN_WINDOW_SECONDS`. If not, the session may have
+ *      been stolen; refuse and require a new magic-link round trip.
+ *   2. Read the pending change from metadata; refuse if missing or
+ *      older than `PENDING_CHANGE_TTL_SECONDS`.
+ *   3. Call `updateUser({email: pendingEmailChange})` — Supabase's
+ *      standard flow sends a confirmation link to the NEW email
+ *      and a notification to the OLD email.
+ *   4. Clear the metadata.
+ *
+ * The email change becomes effective only AFTER the user clicks
+ * Supabase's confirmation link on the new address. This action
+ * just kicks off Supabase's standard flow with all three security
+ * factors verified.
+ */
+export async function confirmEmailChange(): Promise<ConfirmEmailChangeResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    return { ok: false, errorKey: 'not_authenticated' };
+  }
+
+  /*
+   * Freshness check (ADR-003 §3 factor #2: proves possession of
+   * current email via just-completed magic-link sign-in).
+   */
+  const lastSignInIso = user.last_sign_in_at;
+  const lastSignInAge = lastSignInIso
+    ? (Date.now() - new Date(lastSignInIso).getTime()) / 1000
+    : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(lastSignInAge) || lastSignInAge > FRESH_SIGN_IN_WINDOW_SECONDS) {
+    return { ok: false, errorKey: 'fresh_sign_in_required' };
+  }
+
+  const metadata = user.user_metadata;
+  const pendingEmail =
+    typeof metadata.pendingEmailChange === 'string' ? metadata.pendingEmailChange : null;
+  const pendingAtIso =
+    typeof metadata.pendingEmailChangeRequestedAt === 'string'
+      ? metadata.pendingEmailChangeRequestedAt
+      : null;
+  if (!pendingEmail || !pendingAtIso) {
+    return { ok: false, errorKey: 'no_pending_change' };
+  }
+  const pendingAgeSeconds = (Date.now() - new Date(pendingAtIso).getTime()) / 1000;
+  if (!Number.isFinite(pendingAgeSeconds) || pendingAgeSeconds > PENDING_CHANGE_TTL_SECONDS) {
+    /*
+     * Clear the stale metadata as a side effect so a future request
+     * doesn't accidentally re-use it. Best-effort; ignore errors.
+     */
+    await supabase.auth
+      .updateUser({ data: { pendingEmailChange: null, pendingEmailChangeRequestedAt: null } })
+      .catch(() => {
+        /* swallow — already failing, just being tidy */
+      });
+    return { ok: false, errorKey: 'pending_change_expired' };
+  }
+
+  /*
+   * Kick off Supabase's standard email-change flow. Supabase sends:
+   *   - confirmation link to the NEW email (factor #3)
+   *   - notification to the OLD email (defense-in-depth advisory)
+   * Email change becomes effective only after the new-email click.
+   */
+  const { error: updateErr } = await supabase.auth.updateUser({
+    email: pendingEmail,
+    data: { pendingEmailChange: null, pendingEmailChangeRequestedAt: null },
+  });
+  if (updateErr) {
+    console.warn('[confirmEmailChange] updateUser failed', updateErr);
+    return { ok: false, errorKey: 'update_failed' };
+  }
+
+  revalidatePath('/configuracion');
+  return { ok: true };
+}
+
+async function resolveOrigin(): Promise<string> {
+  /*
+   * Prefer the live request's origin so dev (localhost), preview
+   * (vercel.app), and prod (custom domain) all work without
+   * config. Fall back to NEXT_PUBLIC_SITE_URL if the headers
+   * aren't telling us — should never happen in a real request.
+   */
+  const h = await headers();
+  const proto = h.get('x-forwarded-proto') ?? 'https';
+  const host = h.get('x-forwarded-host') ?? h.get('host');
+  if (host) return `${proto}://${host}`;
+  return publicEnv.siteUrl;
 }

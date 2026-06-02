@@ -55,11 +55,16 @@ You are picking up Phase L work from cold context. Do these steps in order:
 > Keep it terse and concrete.
 
 - **Active batch:** L3 — Settings (account hygiene)
-- **Active sub-batch:** _(at §6.2 wall — email-change re-auth decision; awaiting founder direction)_
-- **Last commit relevant to Phase L:** `dc5b542` (L3.3 profile-card + updateProfile).
-- **Next concrete action:** Founder picks the L3.4 re-auth posture. Question surfaced in chat. IFA is passwordless (magic-link + Google OAuth), so the only meaningful "re-auth" is a magic link to the CURRENT email — Supabase's default `updateUser({email})` already (a) sends a confirmation link to the new email and (b) notifies the old email of the change, which covers the simplest threat model without an extra round trip.
-- **Blockers:** §6.2 (email-change re-auth) — open question.
-- **Files in flight (uncommitted edits):** none.
+- **Active sub-batch:** L3.4 — DONE locally (bank-grade email-change two-step flow per ADR-003), awaiting founder commit + push
+- **Last commit relevant to Phase L:** `5a02b25` (ADR-003 bank-grade security posture). L3.4 implements ADR-003 for email changes specifically.
+- **Next concrete action:** Founder commits L3.4. After push, this doc advances to L3.5 (password reset). L3.5 inherits ADR-003 by default — same tightest-security posture; will surface implementation question on entry.
+- **Blockers:** §6.2 (email-change re-auth) RESOLVED 2026-06-01 via ADR-003 (tightest posture; magic-link + last_sign_in_at freshness + new-email confirmation).
+- **Files in flight (uncommitted edits):**
+  - `src/app/(app)/configuracion/actions.ts` (extended: `requestEmailChange` + `confirmEmailChange`)
+  - `src/components/settings/account-card.tsx` (new)
+  - `src/app/(app)/configuracion/confirmar-cambio-correo/page.tsx` (new — step-2 confirmation route)
+  - `src/app/(app)/configuracion/page.tsx` (wired `<AccountCard>`)
+  - `src/messages/es-GT.json` (new `settings.account.email.*` block)
 
 ---
 

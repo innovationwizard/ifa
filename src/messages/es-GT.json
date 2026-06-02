@@ -685,7 +685,49 @@
       },
       "account": {
         "title": "Cuenta",
-        "description": "Correo, contraseña y acceso."
+        "description": "Correo, contraseña y acceso.",
+        "email": {
+          "sectionTitle": "Tu correo",
+          "currentEmail": "Tu correo actual: {email}",
+          "newEmailLabel": "Nuevo correo",
+          "flowHint": "Por seguridad, te mandamos un enlace a tu correo actual. Tienes que abrirlo para continuar.",
+          "sendLink": "Mandar enlace",
+          "sending": "Enviando...",
+          "linkSentTitle": "Te mandamos un enlace",
+          "linkSentBody": "Revisa tu correo actual y haz clic en el enlace que te mandamos. Te llevará a una página para confirmar el cambio.",
+          "error": {
+            "invalid_email": "Ese correo no se ve bien. Revísalo.",
+            "same_as_current": "Ese ya es tu correo actual.",
+            "session_email_missing": "No pudimos leer tu correo actual. Cierra sesión y vuelve a entrar.",
+            "send_failed": "No pudimos mandar el enlace. Intenta de nuevo en un minuto.",
+            "unknown": "Algo falló. Intenta de nuevo."
+          },
+          "passwordSectionTitle": "Contraseña",
+          "passwordPlaceholder": "Próximamente",
+          "confirmPage": {
+            "readyTitle": "Confirma el cambio de correo",
+            "readyBody": "Vas a cambiar tu correo a {newEmail}. Te mandaremos otro enlace al correo nuevo para terminar.",
+            "confirmCta": "Confirmar cambio",
+            "successTitle": "Listo, revisa tu correo nuevo",
+            "successBody": "Te mandamos un enlace al correo nuevo. Ábrelo para terminar el cambio. Mientras tanto sigues con tu correo actual.",
+            "backToSettings": "Volver a configuración",
+            "blocked": {
+              "fresh_sign_in_required": {
+                "title": "El enlace expiró",
+                "body": "El enlace que abriste es de hace más de un minuto. Por seguridad, regresa a configuración y pide otro enlace."
+              },
+              "no_pending_change": {
+                "title": "No hay cambio pendiente",
+                "body": "No encontramos un cambio de correo en curso. Si quieres cambiar tu correo, empieza desde configuración."
+              },
+              "pending_change_expired": {
+                "title": "El cambio expiró",
+                "body": "El cambio de correo que pediste tiene más de 15 minutos. Por seguridad, vuelve a empezar."
+              },
+              "retryCta": "Volver a configuración"
+            }
+          }
+        }
       },
       "data": {
         "title": "Tus datos",
