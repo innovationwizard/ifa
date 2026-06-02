@@ -90,6 +90,18 @@ export default async function IngresarPage({ searchParams }: PageProps) {
           </Link>
           .
         </p>
+
+        <p className="text-ifa-gray-500 mt-3 text-center text-xs">
+          {t('supportPrefix')}{' '}
+          <Link
+            href="/contacto"
+            className="text-ifa-teal-600 underline-offset-2 hover:underline"
+            target="_blank"
+          >
+            {t('supportLink')}
+          </Link>
+          .
+        </p>
       </div>
     </main>
   );

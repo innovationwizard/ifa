@@ -274,6 +274,7 @@
       "failed": "Con errores",
       "total": "Total en el archivo",
       "failureNote": "{count} filas tenían errores y no se guardaron. Revisa tu archivo si quieres volver a intentar.",
+      "failureSupportLink": "¿Sospechas que es un problema con tu banco? Escríbenos.",
       "importAnother": "Subir otro archivo",
       "goDashboard": "Ver mi dashboard",
       "process": {
@@ -528,6 +529,8 @@
       "privacyLink": "Privacidad",
       "deletedTitle": "Borramos tu cuenta",
       "deletedBody": "Gracias por probar IFA. Si quieres volver, escríbenos antes de que pasen 30 días para recuperar tus datos.",
+      "supportPrefix": "¿Algo no funciona?",
+      "supportLink": "Escríbenos",
       "errors": {
         "invalidEmail": "Este correo no parece válido.",
         "rateLimited": "Muchos intentos. Espera un minuto y prueba otra vez.",
@@ -604,15 +607,147 @@
     }
   },
   "legal": {
+    "contact": {
+      "title": "Contacto y soporte",
+      "subtitle": "Una sola dirección de correo durante la beta. Le respondemos personalmente.",
+      "emailLabel": "Escríbanos a",
+      "emailHelp": "Cuéntenos qué le pasó: el banco con el que tiene problema, qué intentó hacer, qué esperaba ver y qué vio. Si tiene una captura de pantalla, adjúntela.",
+      "responseLabel": "Tiempo de respuesta",
+      "responseBody": "Le respondemos en uno o dos días hábiles. Durante la beta cerrada no contamos con horario extendido ni con chat en vivo.",
+      "legalFooter": "Antes de escribirnos, también puede consultar nuestra",
+      "privacyLink": "política de privacidad",
+      "termsLink": "términos de uso"
+    },
     "terms": {
       "title": "Términos de uso",
-      "placeholder": "Esta sección está en revisión legal. Cuando esté lista, aquí verás los términos completos.",
-      "priceChangeTitle": "Precios",
-      "priceChangeBody": "Los precios de IFA pueden cambiar en cualquier momento, sin aviso previo. Si ya estás suscrito, el cambio aplicará en tu siguiente ciclo de pago. Avísanos si tienes dudas escribiendo a ayuda@ifa.gt."
+      "subtitle": "Las reglas para usar IFA. Léalas con calma antes de continuar.",
+      "lastUpdated": "Última actualización: 2 de junio de 2026.",
+      "sections": {
+        "acceptance": {
+          "title": "1. Aceptación",
+          "body": "Al crear una cuenta o usar IFA, usted acepta estos términos. Si no está de acuerdo con alguna parte, no use el servicio."
+        },
+        "service": {
+          "title": "2. Qué es IFA",
+          "body": "IFA es una aplicación que le ayuda a llevar el control de sus finanzas personales y de negocio en Guatemala: importa sus estados de cuenta, organiza sus transacciones y calcula su Salud Financiera. IFA NO es una entidad bancaria, NO da consejo de inversión y NO realiza transferencias de dinero por usted."
+        },
+        "account": {
+          "title": "3. Su cuenta",
+          "body": "Usted es responsable de mantener segura su cuenta. No comparta su acceso con terceros. Si sospecha que alguien más entró a su cuenta, escríbanos de inmediato."
+        },
+        "pricing": {
+          "title": "4. Precios",
+          "intro": "IFA se ofrece con un período de prueba gratuito y luego con un cobro mensual recurrente:",
+          "trial": "Prueba gratuita de 30 días desde el momento en que crea su perfil. No le pedimos tarjeta para empezar.",
+          "individual": "Plan Individual: USD $1.00 al mes.",
+          "business": "Plan Empresarial: USD $20.00 al mes.",
+          "currency": "Los cobros se procesan en dólares de los Estados Unidos (USD) a través de Stripe. Su banco aplica la conversión a quetzales y puede agregar comisiones por uso de tarjeta internacional.",
+          "changes": "Podemos cambiar el precio en cualquier momento. Si usted ya está suscrito, el nuevo precio aplica a partir de su siguiente ciclo de pago y se lo avisamos por correo antes del cambio."
+        },
+        "payment": {
+          "title": "5. Pagos y renovación",
+          "body": "El cobro se realiza automáticamente cada mes con la tarjeta que usted registró en Stripe. La suscripción se renueva sola hasta que usted la cancele. IFA no almacena los datos de su tarjeta; los maneja Stripe en su infraestructura certificada PCI-DSS."
+        },
+        "cancellation": {
+          "title": "6. Cancelación",
+          "body": "Puede cancelar cuando quiera desde el portal de Stripe (botón \"Gestionar pago\" en Configuración → Facturación). Su acceso continúa hasta el final del período que ya pagó. Después de esa fecha, su perfil pasa a estado caducado y deja de tener acceso al servicio hasta que se vuelva a suscribir."
+        },
+        "refunds": {
+          "title": "7. Reembolsos",
+          "body": "Por regla general no hacemos reembolsos. Si usted considera que hubo un cobro indebido o un error de nuestra parte, escríbanos y revisamos cada caso individualmente."
+        },
+        "deletion": {
+          "title": "8. Eliminar su cuenta",
+          "body": "Puede eliminar su cuenta desde Configuración → Eliminar mi cuenta. La eliminación marca su perfil como borrado y le retiramos el acceso de inmediato. Conservamos sus datos por 30 días antes del borrado definitivo, por si usted nos pide recuperarlos. Pasado ese plazo, el borrado es irreversible."
+        },
+        "export": {
+          "title": "9. Exportar sus datos",
+          "body": "Puede descargar toda su información en cualquier momento desde Configuración → Tus datos. Recibirá un archivo ZIP con su perfil, sus transacciones, su historial de Salud Financiera y los estados de cuenta que haya subido."
+        },
+        "acceptableUse": {
+          "title": "10. Uso aceptable",
+          "body": "No use IFA para actividades ilegales, para procesar datos de terceros sin su consentimiento, para realizar ingeniería inversa del servicio, ni para automatizar acciones a un volumen que afecte el funcionamiento de la plataforma. Nos reservamos el derecho de suspender cuentas que incumplan estas reglas."
+        },
+        "ip": {
+          "title": "11. Propiedad intelectual",
+          "body": "El software, la marca, los textos y el diseño de IFA son propiedad de quienes operamos el servicio. Sus datos financieros son y siguen siendo suyos: usted nos otorga únicamente el permiso necesario para almacenarlos, procesarlos y mostrárselos mientras usa el servicio."
+        },
+        "liability": {
+          "title": "12. Limitación de responsabilidad",
+          "body": "IFA se ofrece \"tal cual\". Hacemos nuestro mejor esfuerzo por mantener la información correcta y disponible, pero no garantizamos que esté libre de errores. Nuestra responsabilidad máxima frente a usted, por cualquier motivo, se limita al monto que usted nos haya pagado en los últimos doce meses."
+        },
+        "law": {
+          "title": "13. Ley aplicable",
+          "body": "Estos términos se rigen por las leyes de la República de Guatemala. Cualquier controversia se resuelve ante los tribunales competentes de la ciudad de Guatemala."
+        },
+        "changes": {
+          "title": "14. Cambios a estos términos",
+          "body": "Podemos actualizar estos términos para reflejar cambios en el servicio o en las leyes aplicables. Le avisaremos por correo cuando hagamos cambios importantes. El uso continuado del servicio después de un cambio implica su aceptación."
+        },
+        "contact": {
+          "title": "15. Contacto",
+          "body": "Si tiene dudas sobre estos términos, escríbanos a través de la página de",
+          "cta": "contacto"
+        }
+      },
+      "relatedPrivacy": "Aviso de privacidad",
+      "relatedContact": "Contacto"
     },
     "privacy": {
       "title": "Aviso de privacidad",
-      "placeholder": "Esta sección está en revisión legal. Cuando esté lista, aquí verás cómo cuidamos tu información."
+      "subtitle": "Cómo guardamos, usamos y protegemos su información en IFA.",
+      "lastUpdated": "Última actualización: 2 de junio de 2026.",
+      "sections": {
+        "summary": {
+          "title": "Resumen breve",
+          "body": "IFA almacena su información financiera para mostrársela ordenada y calcularle su Salud Financiera. No vendemos sus datos. No los compartimos con terceros para publicidad. Solo trabajamos con proveedores estrictamente necesarios para que el servicio funcione, y todos están listados más abajo."
+        },
+        "dataWeCollect": {
+          "title": "Datos que recopilamos",
+          "account": "Datos de cuenta: su correo electrónico y, si decide entrar con Google, los datos básicos de identificación que Google nos comparte (nombre y foto de perfil).",
+          "profile": "Datos de perfil: nombre con el que quiere que lo llamemos y, opcionalmente, su número de DPI y fecha de nacimiento. Los datos opcionales puede dejarlos en blanco.",
+          "transactions": "Movimientos financieros: las transacciones que usted importa o registra manualmente, con su fecha, monto, descripción y categoría.",
+          "statements": "Estados de cuenta: los archivos CSV o PDF que usted nos sube quedan guardados para que pueda volverlos a consultar y para mejorar nuestro extractor de columnas.",
+          "usage": "Datos de uso del servicio: registros técnicos como fecha y hora de acceso, navegador y errores que ocurren. No usamos cookies de seguimiento publicitario."
+        },
+        "processors": {
+          "title": "Proveedores que tratan sus datos por nosotros",
+          "intro": "Para que IFA funcione, contratamos servicios de terceros (\"procesadores\") que tratan parte de su información bajo nuestras instrucciones:",
+          "supabase": "alojamiento de su cuenta y de la base de datos donde guardamos su información (autenticación, perfiles, transacciones, estados de cuenta).",
+          "vercel": "alojamiento de la aplicación y de las funciones del servidor que la hacen funcionar.",
+          "stripe": "procesamiento de pagos. Los datos de su tarjeta NUNCA pasan por nuestros servidores; los maneja Stripe directamente en su infraestructura certificada PCI-DSS.",
+          "email": "envío de correos transaccionales (enlaces mágicos, confirmaciones, recibos). Usamos Resend o AWS SES, según la configuración vigente.",
+          "anthropic": "análisis con inteligencia artificial (Claude). Cuando usted sube un estado de cuenta y nuestro extractor no logra entenderlo con reglas, enviamos una muestra de filas a Claude para que nos ayude a identificar columnas. La muestra se procesa y se descarta; Anthropic no la usa para entrenar modelos cuando usamos su API empresarial.",
+          "google": "inicio de sesión con cuenta de Google, únicamente si usted elige esa opción."
+        },
+        "rights": {
+          "title": "Sus derechos",
+          "intro": "Usted siempre conserva el control sobre su información. En cualquier momento puede:",
+          "export": "Descargar todos sus datos en un archivo ZIP desde Configuración → Tus datos.",
+          "delete": "Eliminar su cuenta desde Configuración → Eliminar mi cuenta. Conservamos sus datos por 30 días antes del borrado definitivo, por si nos pide recuperarlos.",
+          "correct": "Corregir cualquier dato de su perfil desde Configuración → Perfil.",
+          "unlink": "Cambiar su correo o desconectar Google desde Configuración → Cuenta."
+        },
+        "retention": {
+          "title": "Cuánto tiempo guardamos sus datos",
+          "body": "Conservamos su información mientras su cuenta esté activa. Si elimina su cuenta, marcamos sus datos como borrados de inmediato y los purgamos definitivamente a los 30 días. Los registros técnicos (logs de acceso, eventos de facturación) se conservan por hasta 12 meses para fines de seguridad y cumplimiento."
+        },
+        "security": {
+          "title": "Cómo protegemos su información",
+          "body": "Aplicamos los controles más estrictos disponibles en cada componente: cifrado en tránsito (HTTPS) y en reposo, autenticación sin contraseña (enlaces mágicos firmados de un solo uso), confirmación adicional por correo para cambios sensibles como cambiar su correo o eliminar su cuenta, separación estricta entre cuentas mediante row-level security en la base de datos, y revisión continua de dependencias en busca de vulnerabilidades. A pesar de todo ello, ningún sistema en internet es 100 % invulnerable; le recomendamos usar una contraseña fuerte en su correo y activar verificación en dos pasos en él."
+        },
+        "changes": {
+          "title": "Cambios a este aviso",
+          "body": "Podemos actualizar este aviso cuando agreguemos nuevos proveedores o funcionalidades. Le avisaremos por correo cuando los cambios sean importantes. La versión vigente siempre estará publicada en esta página, con su fecha de última actualización."
+        },
+        "contact": {
+          "title": "Cómo escribirnos",
+          "body": "Si tiene dudas sobre este aviso o sobre cómo manejamos su información, contáctenos desde la página de",
+          "cta": "contacto"
+        }
+      },
+      "relatedTerms": "Términos de uso",
+      "relatedContact": "Contacto"
     }
   },
   "billing": {

@@ -607,7 +607,10 @@ function ResultStep({
       {summary.failed > 0 && (
         <Alert variant="default" role="alert">
           <AlertDescription className="text-xs">
-            {t('result.failureNote', { count: summary.failed })}
+            {t('result.failureNote', { count: summary.failed })}{' '}
+            <Link href="/contacto" className="text-ifa-teal-700 underline-offset-2 hover:underline">
+              {t('result.failureSupportLink')}
+            </Link>
           </AlertDescription>
         </Alert>
       )}
