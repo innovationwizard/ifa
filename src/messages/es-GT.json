@@ -526,6 +526,8 @@
       "termsLink": "Términos",
       "termsJoiner": "y la",
       "privacyLink": "Privacidad",
+      "deletedTitle": "Borramos tu cuenta",
+      "deletedBody": "Gracias por probar IFA. Si quieres volver, escríbenos antes de que pasen 30 días para recuperar tus datos.",
       "errors": {
         "invalidEmail": "Este correo no parece válido.",
         "rateLimited": "Muchos intentos. Espera un minuto y prueba otra vez.",
@@ -852,10 +854,55 @@
       },
       "delete": {
         "title": "Eliminar mi cuenta",
-        "description": "Borra tu cuenta y tus datos. Esto no se puede deshacer."
+        "description": "Borra tu cuenta y tus datos. Esto no se puede deshacer.",
+        "warningTitle": "Esto borra tu cuenta de IFA",
+        "warningBody": "Vas a perder acceso a tus transacciones, a tu Salud Financiera y a todo lo que tengas guardado. Primero te mandamos un correo de confirmación.",
+        "cta": "Empezar",
+        "sending": "Mandando enlace…",
+        "linkSentTitle": "Te mandamos un correo",
+        "linkSentBody": "Abre el enlace que te enviamos a tu correo. Te vamos a pedir que escribas una frase para confirmar.",
+        "error": {
+          "session_email_missing": "No encontramos tu correo en la sesión. Vuelve a entrar y prueba de nuevo.",
+          "send_failed": "No pudimos mandar el correo. Intenta de nuevo en un momento.",
+          "unknown": "Algo salió mal. Intenta de nuevo."
+        },
+        "confirmPage": {
+          "readyTitle": "Borra tu cuenta de IFA",
+          "readyBody": "Esto borra tu cuenta y deja de mostrarte tus datos. Si te arrepientes, escríbenos pronto. Para confirmar, escribe la frase exacta.",
+          "inputLabel": "Para confirmar, escribe: {phrase}",
+          "inputHint": "Tiene que ser exactamente igual, en mayúsculas.",
+          "cancelCta": "Cancelar",
+          "confirmCta": "Borrar mi cuenta",
+          "confirmingCta": "Borrando…",
+          "error": {
+            "not_authenticated": "Tu sesión terminó. Vuelve a entrar.",
+            "fresh_sign_in_required": "Tu enlace pasó el tiempo de seguridad. Pide otro desde Configuración.",
+            "no_pending_change": "No hay una solicitud activa. Empieza desde Configuración.",
+            "pending_change_expired": "El enlace venció. Empieza de nuevo desde Configuración.",
+            "phrase_mismatch": "La frase no coincide. Escríbela tal como aparece arriba.",
+            "no_profile": "No encontramos tu perfil. Vuelve a entrar.",
+            "soft_delete_failed": "No pudimos borrar tu cuenta. Escríbenos para ayudarte.",
+            "ban_failed": "Borramos tu información pero no pudimos cerrar tu sesión completa. Escríbenos para ayudarte.",
+            "unknown": "Algo salió mal. Intenta de nuevo o escríbenos."
+          },
+          "blocked": {
+            "retryCta": "Volver a configuración",
+            "fresh_sign_in_required": {
+              "title": "Necesitamos confirmar otra vez",
+              "body": "Tu enlace ya pasó el tiempo de seguridad. Vuelve a Configuración y pide uno nuevo."
+            },
+            "no_pending_change": {
+              "title": "No hay nada que borrar",
+              "body": "No encontramos una solicitud para borrar tu cuenta. Empieza desde Configuración."
+            },
+            "pending_change_expired": {
+              "title": "El enlace venció",
+              "body": "Pasaron más de 15 minutos. Empieza de nuevo desde Configuración."
+            }
+          }
+        }
       }
-    },
-    "placeholderSoon": "Próximamente"
+    }
   },
   "errors": {
     "generic": {

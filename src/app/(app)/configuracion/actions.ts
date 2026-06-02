@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { getCurrentUser, createSupabaseServerSideClient } from '@/lib/auth/server';
 import { profileRepo } from '@/lib/db/repositories';
 import { publicEnv } from '@/lib/env';
+import { getSupabaseAdmin } from '@/lib/storage/supabase-admin';
 
 /**
  * Server actions for `/configuracion` — Phase L3.3+.
@@ -680,6 +681,209 @@ export async function confirmGoogleUnlink(): Promise<ConfirmGoogleUnlinkResult> 
   });
 
   revalidatePath('/configuracion');
+  return { ok: true };
+}
+
+// ----------------------------------------------------------------------------
+// Account deletion — Phase L3.7 (ADR-003 bank-grade two-step flow).
+// ----------------------------------------------------------------------------
+
+/*
+ * Same three-factor gate as L3.4/L3.5.5/L3.5.6 (freshness + pending +
+ * auth) PLUS a type-to-confirm phrase (founder decision 2026-06-02):
+ * the user must type "ELIMINAR MI CUENTA" verbatim before the confirm
+ * button posts. The phrase is checked server-side regardless of the
+ * client-side gating, because client-only checks are not security
+ * controls.
+ *
+ * Effect of confirmation (founder decision: soft-delete + Supabase ban):
+ *   - Profile.deletedAt = now (transactional with ProfileMember)
+ *   - Every ProfileMember row for the profile: deletedAt = now
+ *   - Supabase Auth user: ban_duration = '876000h' (~100 yr) so the
+ *     user cannot sign in. Reversible via admin API.
+ *   - signOut() so the cookies in the live browser are cleared.
+ *   - Stripe subscription cancellation: best-effort if we ever wire
+ *     L5. Currently no users have subscriptions so this is a no-op.
+ *
+ * Once the action returns ok, the caller (form action on the confirm
+ * page) signs out and redirects to /ingresar?deleted=1.
+ */
+
+const DELETE_CONFIRMATION_PHRASE = 'ELIMINAR MI CUENTA';
+
+export interface RequestAccountDeletionResult {
+  ok: boolean;
+  errorKey?: 'session_email_missing' | 'send_failed' | 'unknown';
+}
+
+export async function requestAccountDeletion(): Promise<RequestAccountDeletionResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) redirect('/ingresar');
+  const currentEmail = user.email;
+  if (!currentEmail) {
+    return { ok: false, errorKey: 'session_email_missing' };
+  }
+
+  const requestedAt = new Date().toISOString();
+  const { error: stashErr } = await supabase.auth.updateUser({
+    data: { pendingAccountDeletionRequestedAt: requestedAt },
+  });
+  if (stashErr) {
+    console.warn('[requestAccountDeletion] metadata stash failed', stashErr);
+    return { ok: false, errorKey: 'unknown' };
+  }
+
+  const origin = await resolveOrigin();
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent('/configuracion/confirmar-eliminar-cuenta')}`;
+  const { error: otpErr } = await supabase.auth.signInWithOtp({
+    email: currentEmail,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: redirectTo,
+    },
+  });
+  if (otpErr) {
+    console.warn('[requestAccountDeletion] signInWithOtp failed', otpErr);
+    return { ok: false, errorKey: 'send_failed' };
+  }
+
+  return { ok: true };
+}
+
+export interface ConfirmAccountDeletionResult {
+  ok: boolean;
+  errorKey?:
+    | 'not_authenticated'
+    | 'fresh_sign_in_required'
+    | 'no_pending_change'
+    | 'pending_change_expired'
+    | 'phrase_mismatch'
+    | 'no_profile'
+    | 'soft_delete_failed'
+    | 'ban_failed'
+    | 'unknown';
+}
+
+/**
+ * Step 2 of the bank-grade account-deletion flow (ADR-003).
+ *
+ * Four gates + one extra confirmation:
+ *   1. Authenticated.
+ *   2. `last_sign_in_at` fresh (≤ FRESH_SIGN_IN_WINDOW_SECONDS).
+ *   3. `user_metadata.pendingAccountDeletionRequestedAt` set + not stale.
+ *   4. `formData.confirmationPhrase` strictly equals
+ *      "ELIMINAR MI CUENTA" (case-sensitive, no leading/trailing
+ *      whitespace tolerance beyond a single `.trim()`).
+ *
+ * On success: soft-delete the profile in a transaction, ban the
+ * Supabase Auth user (~100 yr), sign out, return ok. The confirm
+ * page redirects to /ingresar?deleted=1.
+ *
+ * Stripe cancellation is intentionally NOT wired here — friends-and-
+ * family beta has no paid subscriptions. When L5 lands, add a
+ * best-effort cancel call before the soft-delete (so DB state lags
+ * Stripe by at most a network round trip).
+ */
+export async function confirmAccountDeletion(
+  formData: FormData,
+): Promise<ConfirmAccountDeletionResult> {
+  const supabase = await createSupabaseServerSideClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    return { ok: false, errorKey: 'not_authenticated' };
+  }
+
+  const lastSignInIso = user.last_sign_in_at;
+  const lastSignInAge = lastSignInIso
+    ? (Date.now() - new Date(lastSignInIso).getTime()) / 1000
+    : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(lastSignInAge) || lastSignInAge > FRESH_SIGN_IN_WINDOW_SECONDS) {
+    return { ok: false, errorKey: 'fresh_sign_in_required' };
+  }
+
+  const metadata = user.user_metadata;
+  const pendingAtIso =
+    typeof metadata.pendingAccountDeletionRequestedAt === 'string'
+      ? metadata.pendingAccountDeletionRequestedAt
+      : null;
+  if (!pendingAtIso) {
+    return { ok: false, errorKey: 'no_pending_change' };
+  }
+  const pendingAgeSeconds = (Date.now() - new Date(pendingAtIso).getTime()) / 1000;
+  if (!Number.isFinite(pendingAgeSeconds) || pendingAgeSeconds > PENDING_CHANGE_TTL_SECONDS) {
+    await supabase.auth
+      .updateUser({ data: { pendingAccountDeletionRequestedAt: null } })
+      .catch(() => {
+        /* swallow — already failing, just being tidy */
+      });
+    return { ok: false, errorKey: 'pending_change_expired' };
+  }
+
+  /*
+   * Server-side phrase check — DO NOT trust the client-side disable
+   * on the submit button. `trim()` tolerates accidental whitespace
+   * (mobile keyboards add trailing spaces) but the casing must match
+   * exactly so muscle-memory typos surface as friction.
+   */
+  const phraseRaw = stringFromForm(formData, 'confirmationPhrase').trim();
+  if (phraseRaw !== DELETE_CONFIRMATION_PHRASE) {
+    return { ok: false, errorKey: 'phrase_mismatch' };
+  }
+
+  const profiles = await profileRepo.findManyForUser(user.id);
+  const profile = profiles[0];
+  if (!profile) {
+    return { ok: false, errorKey: 'no_profile' };
+  }
+
+  /*
+   * Soft-delete DB rows first (atomic). If Supabase ban fails after
+   * this, the user still cannot enter the app because findManyForUser
+   * now excludes deletedAt profiles → proxy redirects to /bienvenida
+   * → bienvenida bootstrap finds no live profile and… edge case worth
+   * noting, but ban almost never fails when service-role key is valid.
+   */
+  try {
+    await profileRepo.softDeleteAccount(profile.id);
+  } catch (err) {
+    console.error('[confirmAccountDeletion] softDeleteAccount failed', err);
+    return { ok: false, errorKey: 'soft_delete_failed' };
+  }
+
+  /*
+   * Ban the Supabase Auth user. ~100 years is the convention for
+   * "permanent" since Supabase's ban_duration is a string duration
+   * (e.g. "24h", "876000h"). Founder can manually unban from the
+   * dashboard during the grace period if the user reaches out.
+   */
+  const admin = getSupabaseAdmin();
+  const { error: banErr } = await admin.auth.admin.updateUserById(user.id, {
+    ban_duration: '876000h',
+  });
+  if (banErr) {
+    console.error('[confirmAccountDeletion] ban failed', banErr);
+    /*
+     * DB already soft-deleted. Returning the ban_failed error tells
+     * the caller to surface a support-required message but the user
+     * still cannot use the app (no live profile). Don't roll back
+     * the DB change — the user said delete, and the inability to
+     * ban is a Supabase-side issue we should address separately.
+     */
+    return { ok: false, errorKey: 'ban_failed' };
+  }
+
+  /*
+   * Sign out the live session. The cookies in the browser will be
+   * cleared on the next response. The confirm page's form action
+   * then redirects to /ingresar?deleted=1 for the goodbye screen.
+   */
+  await supabase.auth.signOut().catch((err: unknown) => {
+    console.warn('[confirmAccountDeletion] signOut failed (non-fatal)', err);
+  });
+
   return { ok: true };
 }
 

@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccountCard } from '@/components/settings/account-card';
 import { DataCard } from '@/components/settings/data-card';
+import { DeleteCard } from '@/components/settings/delete-card';
 import { ProfileCard } from '@/components/settings/profile-card';
 import { getCurrentUser } from '@/lib/auth/server';
 import { profileRepo } from '@/lib/db/repositories';
@@ -152,12 +153,7 @@ export default async function ConfiguracionPage({
               ) : section.key === 'data' ? (
                 <DataCard />
               ) : (
-                /*
-                 * Delete card (L3.7) — still placeholder.
-                 */
-                <p className="text-ifa-gray-500 text-xs tracking-wide uppercase">
-                  {t('placeholderSoon')}
-                </p>
+                <DeleteCard />
               )}
             </CardContent>
           </Card>

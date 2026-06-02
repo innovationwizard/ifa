@@ -26,9 +26,19 @@ export const profileRepo = {
     return prisma.profile.findFirst(args);
   },
 
+  /**
+   * Lookup the profiles a user belongs to. Excludes soft-deleted profiles
+   * AND soft-deleted membership rows (Phase L3.7 — once an account is
+   * marked deleted, the user must never see it again, and the proxy /
+   * server-side `getCurrentUser()` plus the Supabase ban that L3.7 sets
+   * should prevent them from even reaching code that calls this).
+   */
   findManyForUser(userId: string): Promise<Profile[]> {
     return prisma.profile.findMany({
-      where: { members: { some: { userId } } },
+      where: {
+        deletedAt: null,
+        members: { some: { userId, deletedAt: null } },
+      },
       orderBy: { createdAt: 'asc' },
     });
   },
@@ -114,6 +124,45 @@ export const profileRepo = {
   listMembersForExport() {
     return prisma.profileMember.findMany({
       orderBy: { invitedAt: 'asc' },
+    });
+  },
+
+  /**
+   * Soft-delete an account (Phase L3.7). Sets `deletedAt` on the Profile
+   * row AND on every related ProfileMember row atomically. Uses
+   * `prismaUnscoped` because we don't want the tenancy extension to
+   * inject `where: { profileId }` on the ProfileMember updateMany —
+   * the explicit `where` IS the safety boundary, and a future caller
+   * that's not inside withTenant (e.g. an admin tool or test) should
+   * still be able to invoke this.
+   *
+   * Returns the affected counts so the calling action can log them
+   * (and the founder can audit deletions later).
+   *
+   * Does NOT touch Supabase Auth (caller bans the user) or Stripe
+   * (caller cancels the subscription). Keeping each responsibility
+   * separate makes failure recovery clearer: the DB transaction can
+   * succeed even if Stripe is down, and we can still ban the user.
+   */
+  async softDeleteAccount(profileId: string): Promise<{
+    profileUpdated: boolean;
+    membersDeactivated: number;
+  }> {
+    const now = new Date();
+    return prismaUnscoped.$transaction(async (tx) => {
+      const profile = await tx.profile.update({
+        where: { id: profileId },
+        data: { deletedAt: now },
+        select: { id: true },
+      });
+      const members = await tx.profileMember.updateMany({
+        where: { profileId, deletedAt: null },
+        data: { deletedAt: now },
+      });
+      return {
+        profileUpdated: Boolean(profile),
+        membersDeactivated: members.count,
+      };
     });
   },
 };
